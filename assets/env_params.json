@@ -1,0 +1,559 @@
+{
+    "OneRoom": {
+        "SF_epoch": 30,
+        "OP_epoch": 5,
+        "HC_epoch": 100,
+        "OC_epoch": 100,
+        "PPO_epoch": 100,
+        "SAC_epoch": 100,
+        "step_per_epoch": 50,
+        "op_mode": "ppo",
+        "sf_log_interval": 10,
+        "op_log_interval": 1,
+        "hc_log_interval": 20,
+        "oc_log_interval": 10,
+        "ppo_log_interval": 10,
+        "sac_log_interval": 10,
+        "sf_lr": 1e-4,
+        "op_policy_lr": 1e-4,
+        "op_critic_lr": 1e-4,
+        "hc_policy_lr": 1e-4,
+        "hc_critic_lr": 1e-4,
+        "oc_policy_lr": 1e-4,
+        "oc_critic_lr": 3e-4,
+        "ppo_policy_lr": 1e-4,
+        "ppo_critic_lr": 3e-4,
+        "sac_policy_lr": 1e-4,
+        "sac_critic_lr": 3e-4,
+        "sf_fc_dim": 512,
+        "feature_weights": [
+            1.0,
+            0.0,
+            -1.0
+        ],
+        "op_feature_weights": [
+            [
+                1.0,
+                0.0,
+                0.0
+            ],
+            [
+                -1.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                1.0,
+                0.0
+            ],
+            [
+                0.0,
+                -1.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                1.0
+            ],
+            [
+                0.0,
+                0.0,
+                -1.0
+            ]
+        ],
+        "op_policy_dim": [
+            64,
+            64
+        ],
+        "op_critic_dim": [
+            128,
+            128
+        ],
+        "hc_policy_dim": [
+            64,
+            64
+        ],
+        "hc_critic_dim": [
+            128,
+            128
+        ],
+        "oc_fc_dim": 64,
+        "oc_termination_dim": [
+            512,
+            512
+        ],
+        "oc_critic_dim": [
+            128,
+            128
+        ],
+        "ppo_policy_dim": [
+            64,
+            64
+        ],
+        "ppo_critic_dim": [
+            128,
+            128
+        ],
+        "sac_policy_dim": [
+            64,
+            64
+        ],
+        "sac_critic_dim": [
+            128,
+            128
+        ],
+        "reward_loss_scaler": 1.0,
+        "state_loss_scaler": 1e-3,
+        "weight_loss_scaler": 1e-7,
+        "lasso_loss_scaler": 1e-4,
+        "episode_len": 50,
+        "warm_batch_size": 1024,
+        "sf_batch_size": 128,
+        "op_batch_size": 128,
+        "hc_batch_size": 128,
+        "oc_batch_size": 128,
+        "ppo_batch_size": 128,
+        "sac_batch_size": 128,
+        "eval_episodes": 10,
+        "max_batch_size": 10000,
+        "min_batch_size": 1000,
+        "post_process": "nonzero_rewards",
+        "render_fps": 10,
+        "gamma": 0.99
+    },
+    "LavaRooms": {
+        "SF_epoch": 50,
+        "OP_epoch": 10,
+        "HC_epoch": 100,
+        "OC_epoch": 100,
+        "PPO_epoch": 100,
+        "SAC_epoch": 100,
+        "step_per_epoch": 50,
+        "op_mode": "ppo",
+        "sf_log_interval": 10,
+        "op_log_interval": 1,
+        "hc_log_interval": 1,
+        "oc_log_interval": 10,
+        "ppo_log_interval": 10,
+        "sac_log_interval": 10,
+        "sf_lr": 1e-4,
+        "op_policy_lr": 1e-4,
+        "op_critic_lr": 1e-4,
+        "hc_policy_lr": 1e-4,
+        "hc_critic_lr": 1e-4,
+        "oc_policy_lr": 1e-4,
+        "oc_critic_lr": 3e-4,
+        "ppo_policy_lr": 1e-4,
+        "ppo_critic_lr": 3e-4,
+        "sac_policy_lr": 1e-4,
+        "sac_critic_lr": 3e-4,
+        "sf_fc_dim": 512,
+        "feature_weights": [
+            1.0,
+            0.0,
+            -1.0
+        ],
+        "op_feature_weights": [
+            [
+                1.0,
+                0.0,
+                0.0
+            ],
+            [
+                -1.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                1.0,
+                0.0
+            ],
+            [
+                0.0,
+                -1.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                1.0
+            ],
+            [
+                0.0,
+                0.0,
+                -1.0
+            ]
+        ],
+        "op_policy_dim": [
+            64,
+            64
+        ],
+        "op_critic_dim": [
+            128,
+            128
+        ],
+        "hc_policy_dim": [
+            64,
+            64
+        ],
+        "hc_critic_dim": [
+            128,
+            128
+        ],
+        "oc_fc_dim": 64,
+        "oc_termination_dim": [
+            512,
+            512
+        ],
+        "oc_critic_dim": [
+            128,
+            128
+        ],
+        "ppo_policy_dim": [
+            64,
+            64
+        ],
+        "ppo_critic_dim": [
+            128,
+            128
+        ],
+        "sac_policy_dim": [
+            64,
+            64
+        ],
+        "sac_critic_dim": [
+            128,
+            128
+        ],
+        "reward_loss_scaler": 1.0,
+        "state_loss_scaler": 1e-3,
+        "weight_loss_scaler": 1e-8,
+        "lasso_loss_scaler": 1e-5,
+        "episode_len": 100,
+        "warm_batch_size": 1024,
+        "sf_batch_size": 128,
+        "op_batch_size": 128,
+        "hc_batch_size": 128,
+        "oc_batch_size": 128,
+        "ppo_batch_size": 128,
+        "sac_batch_size": 128,
+        "eval_episodes": 10,
+        "max_batch_size": 10000,
+        "min_batch_size": 2500,
+        "post_process": "nonzero_rewards",
+        "render_fps": 10,
+        "gamma": 0.99
+    },
+    "CtF": {
+        "SF_epoch": 50,
+        "OP_epoch": 5,
+        "HC_epoch": 100,
+        "OC_epoch": 100,
+        "PPO_epoch": 100,
+        "SAC_epoch": 100,
+        "step_per_epoch": 50,
+        "op_mode": "ppo",
+        "sf_log_interval": 10,
+        "op_log_interval": 1,
+        "hc_log_interval": 20,
+        "oc_log_interval": 10,
+        "ppo_log_interval": 10,
+        "sac_log_interval": 10,
+        "sf_lr": 1e-4,
+        "op_policy_lr": 1e-4,
+        "op_critic_lr": 1e-4,
+        "hc_policy_lr": 1e-4,
+        "hc_critic_lr": 1e-4,
+        "oc_policy_lr": 1e-4,
+        "oc_critic_lr": 3e-4,
+        "ppo_policy_lr": 1e-4,
+        "ppo_critic_lr": 3e-4,
+        "sac_policy_lr": 1e-4,
+        "sac_critic_lr": 3e-4,
+        "sf_fc_dim": 512,
+        "feature_weights": [
+            1.0,
+            0.0,
+            -1.0
+        ],
+        "op_feature_weights": [
+            [
+                1.0,
+                0.0,
+                0.0
+            ],
+            [
+                -1.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                1.0,
+                0.0
+            ],
+            [
+                0.0,
+                -1.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                1.0
+            ],
+            [
+                0.0,
+                0.0,
+                -1.0
+            ]
+        ],
+        "op_policy_dim": [
+            64,
+            64
+        ],
+        "op_critic_dim": [
+            128,
+            128
+        ],
+        "hc_policy_dim": [
+            64,
+            64
+        ],
+        "hc_critic_dim": [
+            128,
+            128
+        ],
+        "oc_fc_dim": 64,
+        "oc_termination_dim": [
+            512,
+            512
+        ],
+        "oc_critic_dim": [
+            128,
+            128
+        ],
+        "ppo_policy_dim": [
+            64,
+            64
+        ],
+        "ppo_critic_dim": [
+            128,
+            128
+        ],
+        "sac_policy_dim": [
+            64,
+            64
+        ],
+        "sac_critic_dim": [
+            128,
+            128
+        ],
+        "reward_loss_scaler": 1.0,
+        "state_loss_scaler": 1e-2,
+        "weight_loss_scaler": 1e-8,
+        "lasso_loss_scaler": 1e-5,
+        "episode_len": 150,
+        "warm_batch_size": 1024,
+        "sf_batch_size": 1024,
+        "op_batch_size": 256,
+        "hc_batch_size": 256,
+        "oc_batch_size": 256,
+        "ppo_batch_size": 256,
+        "sac_batch_size": 256,
+        "eval_episodes": 10,
+        "max_batch_size": 10000,
+        "min_batch_size": 2500,
+        "post_process": "nonzero_rewards",
+        "render_fps": 10,
+        "gamma": 0.99
+    },
+    "PointNavigation": {
+        "SF_epoch": 300,
+        "OP_epoch": 2,
+        "HC_epoch": 100,
+        "OC_epoch": 100,
+        "PPO_epoch": 100,
+        "SAC_epoch": 100,
+        "step_per_epoch": 50,
+        "op_mode": "ppo",
+        "sf_log_interval": 100,
+        "op_log_interval": 1,
+        "hc_log_interval": 20,
+        "oc_log_interval": 10,
+        "ppo_log_interval": 10,
+        "sac_log_interval": 10,
+        "sf_lr": 1e-4,
+        "op_policy_lr": 1e-4,
+        "op_critic_lr": 1e-4,
+        "hc_policy_lr": 1e-4,
+        "hc_critic_lr": 1e-4,
+        "oc_policy_lr": 1e-4,
+        "oc_critic_lr": 3e-4,
+        "ppo_policy_lr": 1e-4,
+        "ppo_critic_lr": 3e-4,
+        "sac_policy_lr": 1e-4,
+        "sac_critic_lr": 3e-4,
+        "sf_fc_dim": 512,
+        "feature_weights": [
+            1.0,
+            0.5,
+            0.0,
+            -0.5,
+            -1.0
+        ],
+        "op_feature_weights": [
+            [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ]
+        ],
+        "op_policy_dim": [
+            64,
+            64
+        ],
+        "op_critic_dim": [
+            128,
+            128
+        ],
+        "hc_policy_dim": [
+            64,
+            64
+        ],
+        "hc_critic_dim": [
+            128,
+            128
+        ],
+        "oc_fc_dim": 64,
+        "oc_termination_dim": [
+            512,
+            512
+        ],
+        "oc_critic_dim": [
+            128,
+            128
+        ],
+        "ppo_policy_dim": [
+            64,
+            64
+        ],
+        "ppo_critic_dim": [
+            128,
+            128
+        ],
+        "sac_policy_dim": [
+            64,
+            64
+        ],
+        "sac_critic_dim": [
+            128,
+            128
+        ],
+        "reward_loss_scaler": 1.0,
+        "state_loss_scaler": 0.1,
+        "weight_loss_scaler": 1e-7,
+        "lasso_loss_scaler": 1.0,
+        "episode_len": 100,
+        "warm_batch_size": 4096,
+        "sf_batch_size": 1024,
+        "op_batch_size": 512,
+        "hc_batch_size": 512,
+        "oc_batch_size": 512,
+        "ppo_batch_size": 512,
+        "sac_batch_size": 512,
+        "eval_episodes": 10,
+        "max_batch_size": 100000,
+        "min_batch_size": 5000,
+        "post_process": "nonzero_rewards",
+        "render_fps": 10,
+        "gamma": 0.99
+    },
+    "InvertedPendulum": {
+        "SF_epoch": 500,
+        "OP_epoch": 20,
+        "HC_epoch": 200,
+        "PPO_epoch": 200,
+        "SAC_epoch": 2000,
+        "step_per_epoch": 50,
+        "sac_step_per_epoch": 10,
+        "sf_log_interval": 100,
+        "op_log_interval": 5,
+        "hc_log_interval": 50,
+        "ppo_log_interval": 50,
+        "sac_log_interval": 10,
+        "episode_len": 1000,
+        "op_batch_size": 1024,
+        "hc_batch_size": 2048,
+        "ppo_batch_size": 1024,
+        "sac_batch_size": 4096,
+        "oc_batch_size": 1024,
+        "batch_size": 2048,
+        "eval_episodes": 6,
+        "feature_fc_dim": 256,
+        "fc_dim": 64,
+        "sf_dim": 32,
+        "render_fps": 60,
+        "gamma": 0.99
+    },
+    "Hopper": {
+        "SF_epoch": 500,
+        "OP_epoch": 20,
+        "HC_epoch": 200,
+        "PPO_epoch": 200,
+        "SAC_epoch": 2000,
+        "step_per_epoch": 50,
+        "sac_step_per_epoch": 10,
+        "sf_log_interval": 100,
+        "op_log_interval": 5,
+        "hc_log_interval": 50,
+        "ppo_log_interval": 50,
+        "sac_log_interval": 10,
+        "episode_len": 1000,
+        "op_batch_size": 1024,
+        "hc_batch_size": 2048,
+        "ppo_batch_size": 1024,
+        "sac_batch_size": 4096,
+        "oc_batch_size": 1024,
+        "batch_size": 2048,
+        "eval_episodes": 6,
+        "feature_fc_dim": 256,
+        "fc_dim": 64,
+        "sf_dim": 32,
+        "render_fps": 60,
+        "gamma": 0.99
+    }
+}
