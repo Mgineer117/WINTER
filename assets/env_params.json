@@ -242,7 +242,7 @@
         "sac_batch_size": 128,
         "eval_episodes": 10,
         "max_batch_size": 10000,
-        "min_batch_size": 5000,
+        "min_batch_size": 2500,
         "post_process": "nonzero_rewards",
         "render_fps": 10,
         "gamma": 0.99
