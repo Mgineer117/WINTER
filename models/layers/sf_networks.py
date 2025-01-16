@@ -136,7 +136,7 @@ class ConvNetwork(nn.Module):
             activation=self.act,
         )
 
-        self.en_last_act = nn.ReLU()
+        self.en_last_act = nn.Sigmoid()
 
         ### Decoding module
         # preprocess

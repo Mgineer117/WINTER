@@ -164,16 +164,21 @@ class HC_Controller(BasePolicy):
         if is_option:
             # option selection
             with torch.no_grad():
-                a, _ = self.op_network(obs, z_argmax, deterministic=deterministic)
+                a, option_dict = self.op_network(
+                    obs, z_argmax, deterministic=deterministic
+                )
+            option_termination = option_dict["option_termination"]
         else:
             # primitive action selection
             a, _ = self.primitivePolicy(obs["observation"], deterministic=deterministic)
+            option_termination = True
 
         return a, {
             "z": z,
             "z_argmax": z_argmax,
             "is_option": is_option,
             "is_hc_controller": True,
+            "option_termination": option_termination,
             "probs": metaData["probs"],
             "logprobs": metaData["logprobs"],
             "entropy": metaData["entropy"],

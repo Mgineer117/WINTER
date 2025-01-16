@@ -238,7 +238,9 @@ class LASSO(BasePolicy):
         phi_norm = torch.norm(phi, p=1)
         lasso_loss = self._lasso_loss_scaler * phi_norm
 
-        phi_loss = reward_loss + state_loss + weight_loss + lasso_loss
+        lasso_penalty = torch.relu(1e-3 - phi_norm)
+
+        phi_loss = reward_loss + state_loss + weight_loss + lasso_loss + lasso_penalty
 
         # Plot predicted vs true rewards
         if self._forward_steps % 10 == 0:

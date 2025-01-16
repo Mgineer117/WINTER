@@ -12,7 +12,7 @@ from gym_multigrid.core.constants import *
 from gym_multigrid.utils.window import Window
 from gym_multigrid.core.agent import Agent, PolicyAgent, AgentT, MazeActions
 from gym_multigrid.core.grid import Grid
-from gym_multigrid.core.object import Goal, Wall, Lava, Key
+from gym_multigrid.core.object import Goal, Wall, Lava
 from gym_multigrid.core.world import RoomWorld
 from gym_multigrid.multigrid import MultiGridEnv
 from gym_multigrid.typing import Position
@@ -88,10 +88,48 @@ class LavaRooms(MultiGridEnv):
             )
         ]
 
-        self.goal_positions = [[(8, 8)]]  # (7, 1)
+        # These define a fixed grid information
+        # each index corresponds to the grid type
+        self.doorway_positions = [[(2, 6), (6, 2)]]
+        self.vert_wall_positions = [[(6, 0)]]
+        self.hor_wall_positions = [[(0, 6)]]
+
+        self.goal_positions = [[(9, 9)]]  # (7, 1)
         self.agent_positions = [(3, 3)]
-        self.lava_positions = [[(8, 5)]]
-        self.key_positions = [[(5, 8)]]
+        self.lava_positions = [
+            [
+                [
+                    (8, 1),
+                    (7, 2),
+                    (8, 2),
+                    (9, 2),
+                    (6, 3),
+                    (7, 3),
+                    (8, 3),
+                    (9, 3),
+                    (10, 3),
+                    (7, 4),
+                    (8, 4),
+                    (9, 4),
+                    (8, 5),
+                ],
+                [
+                    (1, 8),
+                    (2, 7),
+                    (2, 8),
+                    (2, 9),
+                    (3, 6),
+                    (3, 7),
+                    (3, 8),
+                    (3, 9),
+                    (3, 10),
+                    (4, 7),
+                    (4, 8),
+                    (4, 9),
+                    (5, 8),
+                ],
+            ],
+        ]
 
         self.map_structure = [
             "############",
@@ -141,14 +179,12 @@ class LavaRooms(MultiGridEnv):
             self.put_obj(goal, *pos)
 
         # lava allocation
-        for pos in self.lava_positions[self.grid_type]:
-            lava = Lava(self.world)
-            self.put_obj(lava, *pos)
-
-        # key allocation
-        for pos in self.key_positions[self.grid_type]:
-            key = Key(self.world)
-            self.put_obj(key, *pos)
+        for lava_pos_samples in self.lava_positions[self.grid_type]:
+            num_lava = random.randint(1, 5)
+            random_lava_positions = random.sample(lava_pos_samples, num_lava)
+            for lava_pos in random_lava_positions:
+                lava = Lava(self.world)
+                self.put_obj(lava, *lava_pos)
 
         # agent allocation
         if options["random_init_pos"]:

@@ -454,10 +454,10 @@ class OnlineSampler(Base):
                     next_obs, rew, done, infos = env_step(a)
                     if not done:
                         if metaData["is_hc_controller"]:
-                            for o_t in range(self.min_option_length - 1):
+                            for o_t in range(1, self.min_option_length):
                                 # env stepping
                                 with torch.no_grad():
-                                    option_a, _ = policy(
+                                    option_a, option_dict = policy(
                                         next_obs,
                                         metaData["z_argmax"],
                                         deterministic=deterministic,
@@ -465,11 +465,11 @@ class OnlineSampler(Base):
                                     option_a = option_a.cpu().numpy().squeeze()
 
                                 next_obs, op_rew, done, infos = env_step(option_a)
-                                rew += self.gamma ** (o_t + 1) * op_rew
-                                if done:
+                                rew += self.gamma**o_t * op_rew
+                                if done or option_dict["option_termination"]:
                                     break
                         else:
-                            o_t = 0
+                            o_t = 1
                             option_termination = False
                             while not option_termination:
                                 # env stepping
@@ -485,7 +485,7 @@ class OnlineSampler(Base):
                                 option_termination = policy.predict_option_termination(
                                     next_obs, metaData["z_argmax"]
                                 )
-                                rew += self.gamma ** (o_t + 1) * op_rew
+                                rew += self.gamma**o_t * op_rew
                                 o_t += 1
                                 if done:
                                     break
