@@ -247,10 +247,6 @@ class HC_Controller(BasePolicy):
             value_losses.append(valueLoss.item())
 
             # 2. Policy Update
-            # find mask: the actions contributions by hc policy only
-            pm_mask = torch.argmax(mb_option_actions, dim=-1) == self._num_weights
-
-            ### HC update
             _, _, metaData = self.policy(mb_states)
             # Compute hierarchical policy logprobs and entropy
             logprobs = self.policy.log_prob(metaData["dist"], mb_option_actions)
@@ -264,38 +260,42 @@ class HC_Controller(BasePolicy):
             actor_loss = -torch.min(surr1, surr2).mean()
             entropy_loss = self._entropy_scaler * entropy.mean()
 
-            if isinstance(self.primitivePolicy, HC_PPO) and pm_mask.shape[0] != 0:
-                mb_actions = actions[indices]
-                mb_pm_old_logprobs = pm_old_logprobs[indices]
+            if isinstance(self.primitivePolicy, HC_PPO):
+                # find mask: the actions contributions by hc policy only
+                pm_mask = torch.argmax(mb_option_actions, dim=-1) == self._num_weights
 
-                _, pm_metaData = self.primitivePolicy(mb_states[pm_mask])
+                if pm_mask is not None:
+                    mb_actions = actions[indices]
+                    mb_pm_old_logprobs = pm_old_logprobs[indices]
 
-                pm_logprobs = self.policy.log_prob(
-                    pm_metaData["dist"], mb_actions[pm_mask]
-                )
-                pm_entropy = self.policy.entropy(pm_metaData["dist"])
-                pm_ratios = torch.exp(pm_logprobs - mb_pm_old_logprobs[pm_mask])
+                    _, pm_metaData = self.primitivePolicy(mb_states[pm_mask])
 
-                # prepare updates
-                surr1 = pm_ratios * mb_advantages[pm_mask]
-                surr2 = (
-                    torch.clamp(pm_ratios, 1 - self._eps, 1 + self._eps)
-                    * mb_advantages[pm_mask]
-                )
+                    pm_logprobs = self.policy.log_prob(
+                        pm_metaData["dist"], mb_actions[pm_mask]
+                    )
+                    pm_entropy = self.policy.entropy(pm_metaData["dist"])
+                    pm_ratios = torch.exp(pm_logprobs - mb_pm_old_logprobs[pm_mask])
 
-                pm_actorLoss = -torch.min(surr1, surr2).mean()
-                pm_entropyLoss = self._entropy_scaler * pm_entropy.mean()
+                    # prepare updates
+                    surr1 = pm_ratios * mb_advantages[pm_mask]
+                    surr2 = (
+                        torch.clamp(pm_ratios, 1 - self._eps, 1 + self._eps)
+                        * mb_advantages[pm_mask]
+                    )
 
-                # finishing up
-                actor_loss += pm_actorLoss
-                entropy_loss += pm_entropyLoss
+                    pm_actorLoss = -torch.min(surr1, surr2).mean()
+                    pm_entropyLoss = self._entropy_scaler * pm_entropy.mean()
 
-                # Simplify the repeated patterns
-                ratios = torch.cat((ratios, pm_ratios), dim=0)
-                logprobs = torch.cat((logprobs, pm_logprobs), dim=0)
-                mb_old_logprobs = torch.cat(
-                    (mb_old_logprobs, mb_pm_old_logprobs[pm_mask]), dim=0
-                )
+                    # finishing up
+                    actor_loss += pm_actorLoss
+                    entropy_loss += pm_entropyLoss
+
+                    # Simplify the repeated patterns
+                    ratios = torch.cat((ratios, pm_ratios), dim=0)
+                    logprobs = torch.cat((logprobs, pm_logprobs), dim=0)
+                    mb_old_logprobs = torch.cat(
+                        (mb_old_logprobs, mb_pm_old_logprobs[pm_mask]), dim=0
+                    )
 
             loss = actor_loss + 0.5 * valueLoss - entropy_loss
 
