@@ -248,13 +248,13 @@
         "gamma": 0.99
     },
     "CtF": {
-        "SF_epoch": 50,
+        "SF_epoch": 100,
         "OP_epoch": 5,
         "HC_epoch": 100,
         "OC_epoch": 100,
         "PPO_epoch": 100,
         "SAC_epoch": 100,
-        "step_per_epoch": 50,
+        "step_per_epoch": 10,
         "op_mode": "ppo",
         "sf_log_interval": 10,
         "op_log_interval": 1,
