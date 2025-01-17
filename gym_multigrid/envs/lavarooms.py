@@ -192,19 +192,19 @@ class LavaRooms(MultiGridEnv):
     def get_rewards(self, fwd_cell, rewards):
         if fwd_cell.type == "goal":
             done = True
-            # rewards += 1.0 - 0.9 * (self.step_count / self.max_steps)
-            rewards += -0.5
+            rewards += 1.0 - 0.9 * (self.step_count / self.max_steps)
+            # rewards += -0.5
             # rewards += 0.0
         elif fwd_cell.type == "lava":
             done = True
             #  rewards += 1.0 - 0.9 * (self.step_count / self.max_steps)
-            # rewards += -0.5
+            rewards += -0.5
             rewards += 0.0
         elif fwd_cell.type == "key":
             done = True
-            rewards += 1.0 - 0.9 * (self.step_count / self.max_steps)
+            # rewards += 1.0 - 0.9 * (self.step_count / self.max_steps)
             # rewards += -0.5
-            # rewards += 0.0
+            rewards += 0.0
         else:
             done = False
 
