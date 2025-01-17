@@ -64,7 +64,7 @@ class OptionPolicy(nn.Module):
         # when the input is raw by forawrd() not learn()
         if len(state.shape) == 3 or len(state.shape) == 1:
             state = state.unsqueeze(0)
-            state = state.reshape(state.shape[0], -1)
+        state = state.reshape(state.shape[0], -1)
 
         logits = self.models[z](state)
 
@@ -152,8 +152,12 @@ class OptionCritic(nn.Module):
     def create_model(self, input_dim, hidden_dim, output_dim):
         return MLP(input_dim, hidden_dim, output_dim, activation=self.act)
 
-    def forward(self, x: torch.Tensor, z: int):
-        value = self.models[z](x)
+    def forward(self, state: torch.Tensor, z: int):
+        # when the input is raw by forawrd() not learn()
+        if len(state.shape) == 3 or len(state.shape) == 1:
+            state = state.unsqueeze(0)
+        state = state.reshape(state.shape[0], -1)
+        value = self.models[z](state)
         return value, {"z": z}
 
 

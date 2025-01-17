@@ -125,7 +125,9 @@ class OP_Controller(BasePolicy):
         obs = self.preprocess_obs(obs)
 
         a, metaData = self.policy(obs["observation"], z=z, deterministic=deterministic)
-        value, _ = self.critic(obs["observation"], z=z)
+
+        with torch.no_grad():
+            value, _ = self.critic(obs["observation"], z=z)
         option_term = True if value < 0 else False
 
         return a, {
