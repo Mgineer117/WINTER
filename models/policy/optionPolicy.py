@@ -50,7 +50,6 @@ class OP_Controller(BasePolicy):
         self.op_feature_weights = (nn.Parameter(op_feature_weights)).to(
             dtype=self._dtype, device=self.device
         )
-        self.op_feature_weights.requires_grad = False
 
         self.num_weights = op_feature_weights.shape[0]
 
