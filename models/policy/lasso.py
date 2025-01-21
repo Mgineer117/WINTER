@@ -139,7 +139,6 @@ class LASSO(BasePolicy):
         self.feature_weights = nn.Parameter(feature_weights).to(
             dtype=self._dtype, device=self.device
         )
-        self.feature_weights.requires_grad = False
 
         # Normalize to have L2 norm = 1
         self.feature_weights.data = (
