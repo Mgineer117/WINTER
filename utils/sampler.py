@@ -183,7 +183,7 @@ class OnlineSampler(Base):
         state_dim: tuple,
         action_dim: int,
         hc_action_dim: int,
-        min_option_length: int,
+        max_option_length: int,
         episode_len: int,
         batch_size: int,
         min_batch_for_worker: int = 1024,
@@ -210,7 +210,7 @@ class OnlineSampler(Base):
         self.gamma = gamma
 
         # Misc params
-        self.min_option_length = min_option_length
+        self.max_option_length = max_option_length
 
         # sampling params
         self.episode_len = episode_len
@@ -454,7 +454,7 @@ class OnlineSampler(Base):
                     next_obs, rew, done, infos = env_step(a)
                     if not done:
                         if metaData["is_hc_controller"]:
-                            for o_t in range(1, self.min_option_length):
+                            for o_t in range(1, self.max_option_length):
                                 # env stepping
                                 with torch.no_grad():
                                     option_a, option_dict = policy(
@@ -474,7 +474,7 @@ class OnlineSampler(Base):
                             while not option_termination:
                                 # env stepping
                                 with torch.no_grad():
-                                    option_a, _ = policy(
+                                    option_a, option_dict = policy(
                                         next_obs,
                                         metaData["z_argmax"],
                                         deterministic=deterministic,

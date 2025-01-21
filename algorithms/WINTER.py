@@ -47,7 +47,7 @@ class WINTER:
             state_dim=args.s_dim,
             action_dim=args.a_dim,
             hc_action_dim=args.num_weights + 1,
-            min_option_length=args.min_option_length,
+            max_option_length=args.max_option_length,
             episode_len=args.episode_len,
             batch_size=args.warm_batch_size,
             min_batch_for_worker=args.min_batch_for_worker,
@@ -111,7 +111,7 @@ class WINTER:
         self.hc_evaluator = HC_Evaluator(
             dir=self.hc_path,
             log_interval=args.hc_log_interval,
-            min_option_length=args.min_option_length,
+            max_option_length=args.max_option_length,
             **evaluator_params,
         )
 
