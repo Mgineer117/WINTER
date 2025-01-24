@@ -314,13 +314,15 @@ def call_ocNetwork(args):
     return policy
 
 
-def call_sfNetwork(args, sf_path: str | None = None):
+def call_sfNetwork(
+    args, reward_feature_weights: np.ndarray, sf_path: str | None = None
+):
     from models.layers.sf_networks import AutoEncoder, ConvNetwork
     from models.policy import LASSO
 
     if args.import_sf_model:
         print("Loading previous SF parameters....")
-        feaNet, feature_weights = pickle.load(
+        feaNet, reward_feature_weights = pickle.load(
             open(f"log/eval_log/model_for_eval/{args.env_name}/sf_network.p", "rb")
         )
     else:
@@ -353,14 +355,14 @@ def call_sfNetwork(args, sf_path: str | None = None):
                 encoder_conv_layers=encoder_conv_layers,
                 decoder_conv_layers=decoder_conv_layers,
                 fc_dim=args.sf_fc_dim,
-                sf_dim=len(args.feature_weights),
+                sf_r_dim=args.sf_r_dim,
+                sf_s_dim=args.sf_s_dim,
                 activation=nn.Tanh(),
             )
-        feature_weights = torch.tensor(args.feature_weights)
 
     sf_network = LASSO(
         feaNet=feaNet,
-        feature_weights=feature_weights,
+        feature_weights=reward_feature_weights,
         a_dim=args.a_dim,
         sf_lr=args.sf_lr,
         batch_size=args.sf_batch_size,
@@ -378,6 +380,8 @@ def call_sfNetwork(args, sf_path: str | None = None):
 
 def call_opNetwork(
     sf_network: nn.Module,
+    reward_options: np.ndarray,
+    state_options: np.ndarray,
     args,
 ):
     from models.policy import OP_Controller
@@ -385,7 +389,7 @@ def call_opNetwork(
     if args.import_op_model:
         print("Loading previous OP parameters....")
         if args.op_mode == "sac":
-            policy, critic, op_feature_weights, alpha = pickle.load(
+            policy, critic, reward_options, state_options, alpha = pickle.load(
                 open(
                     f"log/eval_log/model_for_eval/{args.env_name}/op_sac_network.p",
                     "rb",
@@ -393,28 +397,26 @@ def call_opNetwork(
             )
         elif args.op_mode == "ppo":
             alpha = None
-            policy, critic, op_feature_weights = pickle.load(
+            policy, critic, reward_options, state_options = pickle.load(
                 open(
                     f"log/eval_log/model_for_eval/{args.env_name}/op_ppo_network.p",
                     "rb",
                 )
             )
     else:
-        op_feature_weights = torch.tensor(args.op_feature_weights)
-
         if args.op_mode == "sac":
             policy = OptionPolicy(
                 input_dim=args.flat_s_dim,
                 hidden_dim=args.op_policy_dim,
                 a_dim=args.a_dim,
-                num_weights=op_feature_weights.shape[0],
+                num_weights=args.num_weights,
                 activation=nn.ReLU(),
                 is_discrete=args.is_discrete,
             )
             critic = OPtionCriticTwin(
                 input_dim=args.flat_s_dim + args.a_dim,
                 hidden_dim=args.op_critic_dim,
-                num_weights=op_feature_weights.shape[0],
+                num_weights=args.num_weights,
                 activation=nn.ReLU(),
             )
             alpha = args.sac_init_alpha
@@ -423,14 +425,14 @@ def call_opNetwork(
                 input_dim=args.flat_s_dim,
                 hidden_dim=args.op_policy_dim,
                 a_dim=args.a_dim,
-                num_weights=op_feature_weights.shape[0],
+                num_weights=args.num_weights,
                 activation=nn.Tanh(),
                 is_discrete=args.is_discrete,
             )
             critic = OptionCritic(
                 input_dim=args.flat_s_dim,
                 hidden_dim=args.op_critic_dim,
-                num_weights=op_feature_weights.shape[0],
+                num_weights=args.num_weights,
                 activation=nn.Tanh(),
             )
             alpha = None
@@ -439,7 +441,8 @@ def call_opNetwork(
         sf_network=sf_network,
         policy=policy,
         critic=critic,
-        op_feature_weights=op_feature_weights,
+        reward_options=reward_options,
+        state_options=state_options,
         minibatch_size=args.op_batch_size,
         alpha=alpha,
         args=args,

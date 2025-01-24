@@ -18,7 +18,7 @@ from utils.call_env import call_env
 
 
 class FeatureTrain:
-    def __init__(self, env: gym.Env, logger, writer, args):
+    def __init__(self, env: gym.Env, logger, writer, reward_feature_weights, args):
         """
         SNAC Specialized Neurons and Clustering Architecture
         ---------------------------------------------------------------------------
@@ -39,7 +39,7 @@ class FeatureTrain:
         self.buffer = TrajectoryBuffer(
             state_dim=args.s_dim,
             action_dim=args.a_dim,
-            hc_action_dim=len(args.feature_weights),
+            hc_action_dim=args.num_weights + 1,
             episode_len=args.episode_len,
             min_batch_size=args.min_batch_size,
             max_batch_size=args.max_batch_size,
@@ -48,7 +48,7 @@ class FeatureTrain:
             training_envs=self.env,
             state_dim=args.s_dim,
             action_dim=args.a_dim,
-            hc_action_dim=len(args.feature_weights),
+            hc_action_dim=args.num_weights + 1,
             max_option_length=args.max_option_length,
             episode_len=args.episode_len,
             batch_size=args.warm_batch_size,
@@ -62,6 +62,7 @@ class FeatureTrain:
         # object initialization
         self.logger = logger
         self.writer = writer
+        self.reward_feature_weights = reward_feature_weights
         self.args = args
 
         # param initialization
@@ -112,7 +113,9 @@ class FeatureTrain:
             - None
         """
         ### Call network param and run
-        sf_network = call_sfNetwork(self.args, self.sf_path)
+        sf_network = call_sfNetwork(
+            self.args, self.reward_feature_weights, self.sf_path
+        )
         lr_step_size = self.args.SF_epoch // 10
         scheduler = torch.optim.lr_scheduler.StepLR(
             sf_network.feature_optims, step_size=lr_step_size, gamma=0.9

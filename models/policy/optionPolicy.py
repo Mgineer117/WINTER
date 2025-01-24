@@ -28,7 +28,8 @@ class OP_Controller(BasePolicy):
         sf_network: BasePolicy,
         policy: OptionPolicy,
         critic: OptionCritic,
-        op_feature_weights: torch.Tensor,
+        reward_options: np.ndarray,
+        state_options: np.ndarray,
         alpha: int,
         minibatch_size: int,
         args,
@@ -47,11 +48,14 @@ class OP_Controller(BasePolicy):
         self.device = args.device
 
         # algorithmic commons
-        self.op_feature_weights = (nn.Parameter(op_feature_weights)).to(
+        self.reward_options = nn.Parameter(torch.tensor(reward_options)).to(
+            dtype=self._dtype, device=self.device
+        )
+        self.state_options = nn.Parameter(torch.tensor(state_options)).to(
             dtype=self._dtype, device=self.device
         )
 
-        self.num_weights = op_feature_weights.shape[0]
+        self.num_weights = reward_options.shape[0] + state_options.shape[0]
 
         # params for training
         self.optimizers = {}
@@ -150,7 +154,7 @@ class OP_Controller(BasePolicy):
             loss_dict, update_time = self.sac_learn(batch, z)
         return loss_dict, update_time
 
-    def psudo_reward(self, states, next_states, z):
+    def psuedo_reward(self, states, next_states, z):
         obs = {"observation": states}
         next_obs = {"observation": next_states}
 
@@ -158,7 +162,13 @@ class OP_Controller(BasePolicy):
         next_phi = self.sf_network.get_features(next_obs)
 
         deltaPhi = next_phi - phi
-        weight = self.op_feature_weights[z]
+        if z < self.reward_options.shape[0]:
+            deltaPhi, _ = self.split(deltaPhi, self.reward_options.shape[0])
+            weight = self.reward_options[z]
+        else:
+            z = z - self.reward_options.shape[0]
+            _, deltaPhi = self.split(deltaPhi, self.reward_options.shape[0])
+            weight = self.state_options[z]
 
         pseudo_rewards = self.multiply_weights(deltaPhi, weight)
         return pseudo_rewards
@@ -177,7 +187,7 @@ class OP_Controller(BasePolicy):
         terminals = to_tensor(batch["terminals"])
 
         # batch processing
-        rewards = self.psudo_reward(states, next_states, z)
+        rewards = self.psuedo_reward(states, next_states, z)
         states = states.reshape(states.shape[0], -1)
         next_states = next_states.reshape(next_states.shape[0], -1)
 
@@ -469,7 +479,8 @@ class OP_Controller(BasePolicy):
     def save_model(self, logdir, epoch=None, is_best=False):
         self.policy = self.policy.cpu()
         self.critic = self.critic.cpu()
-        weights = self.op_feature_weights.clone().cpu()
+        reward_options = self.reward_options.clone().cpu().numpy()
+        state_options = self.state_options.clone().cpu().numpy()
 
         # save checkpoint
         if is_best:
@@ -483,14 +494,20 @@ class OP_Controller(BasePolicy):
                 (
                     self.policy,
                     self.critic,
-                    weights,
+                    reward_options,
+                    state_options,
                     alpha,
                 ),
                 open(path, "wb"),
             )
         elif self.mode == "ppo":
             pickle.dump(
-                (self.policy, self.critic, weights),
+                (
+                    self.policy,
+                    self.critic,
+                    reward_options,
+                    state_options,
+                ),
                 open(path, "wb"),
             )
 

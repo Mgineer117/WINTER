@@ -98,7 +98,7 @@ class LASSO(BasePolicy):
     def __init__(
         self,
         feaNet: ConvNetwork,
-        feature_weights: torch.Tensor,
+        feature_weights: np.ndarray,
         a_dim: int,
         sf_lr: float = 1e-4,
         batch_size: int = 1024,
@@ -136,7 +136,7 @@ class LASSO(BasePolicy):
         self.sf_path = sf_path
 
         ### Define feature_weights
-        self.feature_weights = nn.Parameter(feature_weights).to(
+        self.feature_weights = nn.Parameter(torch.tensor(feature_weights)).to(
             dtype=self._dtype, device=self.device
         )
 
@@ -220,12 +220,15 @@ class LASSO(BasePolicy):
         w ~ [1, F/2]
         """
         phi, conv_dict = self.feaNet(states, deterministic=False)
+        phi_r, phi_s = self.split(phi, self.feature_weights.shape[0])
 
-        reward_pred = self.multiply_weights(phi, self.feature_weights)
+        reward_pred = self.multiply_weights(phi_r, self.feature_weights)
         reward_loss = self._reward_loss_scaler * self.mse_loss(reward_pred, rewards)
 
-        state_pred = self.decode(phi, actions, conv_dict)
-        state_loss = self._state_loss_scaler * self.mse_loss(state_pred, next_states)
+        state_pred = self.decode(phi_s, actions, conv_dict)
+        state_loss = self._state_loss_scaler * (
+            1 / self.mse_loss(state_pred, next_states)
+        )
 
         weight_norm = 0
         for param in self.feaNet.parameters():
@@ -234,10 +237,12 @@ class LASSO(BasePolicy):
 
         weight_loss = self._weight_loss_scaler * weight_norm
 
-        phi_norm = torch.norm(phi, p=1)
-        lasso_loss = self._lasso_loss_scaler * phi_norm
+        phi_r_norm = torch.norm(phi_r, p=1)
+        phi_s_norm = torch.norm(phi_s, p=1)
 
-        lasso_penalty = torch.relu(1e-3 - phi_norm)
+        lasso_loss = self._lasso_loss_scaler * (phi_r_norm + phi_s_norm)
+
+        lasso_penalty = torch.relu(1e-3 - phi_r_norm)
 
         phi_loss = reward_loss + state_loss + weight_loss + lasso_loss + lasso_penalty
 
@@ -250,7 +255,8 @@ class LASSO(BasePolicy):
             "state_loss": state_loss,
             "weight_loss": weight_loss,
             "lasso_loss": lasso_loss,
-            "phi_norm": phi_norm,
+            "phi_r_norm": phi_r_norm,
+            "phi_s_norm": phi_s_norm,
         }
 
     def decode(self, phi, actions, conv_dict):
@@ -309,7 +315,8 @@ class LASSO(BasePolicy):
             "SF/state_loss": phi_loss_dict["state_loss"].item(),
             "SF/weight_loss": phi_loss_dict["weight_loss"].item(),
             "SF/lasso_loss": phi_loss_dict["lasso_loss"].item(),
-            "SF/phi_norm": phi_loss_dict["phi_norm"].item(),
+            "SF/phi_r_norm": phi_loss_dict["phi_r_norm"].item(),
+            "SF/phi_s_norm": phi_loss_dict["phi_s_norm"].item(),
         }
         loss_dict.update(norm_dict)
         loss_dict.update(phi_grad_dict)

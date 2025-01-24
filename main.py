@@ -3,8 +3,10 @@ import random
 from algorithms import FeatureTrain, WINTER, PPO, SAC, OptionCritic
 
 from utils.call_env import call_env
-from utils.utils import setup_logger, seed_all, load_hyperparams
 from utils.get_args import get_args
+from utils.call_feature_weights import call_feature_weights
+from utils.utils import setup_logger, seed_all, load_hyperparams
+
 
 import wandb
 
@@ -51,7 +53,16 @@ def train(args, seed, unique_id):
             args=args,
         )
     elif args.algo_name == "WINTER":
-        ft = FeatureTrain(env=env, logger=logger, writer=writer, args=args)
+        reward_feature_weights, reward_options, state_options = call_feature_weights(
+            args.sf_r_dim, args.sf_s_dim
+        )
+        ft = FeatureTrain(
+            env=env,
+            logger=logger,
+            writer=writer,
+            reward_feature_weights=reward_feature_weights,
+            args=args,
+        )
         sf_network, prev_epoch = ft.train()
         alg = WINTER(
             env=env,
@@ -59,6 +70,8 @@ def train(args, seed, unique_id):
             prev_epoch=prev_epoch,
             logger=logger,
             writer=writer,
+            reward_options=reward_options,
+            state_options=state_options,
             args=args,
         )
     else:

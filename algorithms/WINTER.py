@@ -15,7 +15,15 @@ from utils import *
 
 class WINTER:
     def __init__(
-        self, env: gym.Env, sf_network: nn.Module, prev_epoch: int, logger, writer, args
+        self,
+        env: gym.Env,
+        sf_network: nn.Module,
+        prev_epoch: int,
+        logger,
+        writer,
+        reward_options: np.ndarray,
+        state_options: np.ndarray,
+        args,
     ):
         """
         SNAC Specialized Neurons and Clustering Architecture
@@ -61,6 +69,8 @@ class WINTER:
         self.sf_network = sf_network
         self.logger = logger
         self.writer = writer
+        self.reward_options = reward_options
+        self.state_options = state_options
         self.args = args
 
         # param initialization
@@ -130,7 +140,9 @@ class WINTER:
         self.sampler.initialize(batch_size=total_batch_size)
 
         if not self.args.import_op_model:
-            self.op_network = call_opNetwork(self.sf_network, self.args)
+            self.op_network = call_opNetwork(
+                self.sf_network, self.reward_options, self.state_options, self.args
+            )
             print_model_summary(self.op_network, model_name="OP model")
 
             op_trainer = OPTrainer(

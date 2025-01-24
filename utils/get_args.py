@@ -350,25 +350,25 @@ def get_args(verbose=True):
     parser.add_argument(
         "--op-entropy-scaler",
         type=float,
-        default=5e-3,
+        default=1e-3,
         help="Option policy entropy scaler",
     )
     parser.add_argument(
         "--hc-entropy-scaler",
         type=float,
-        default=5e-2,
+        default=5e-3,
         help="Hierarchical policy entropy scaler",
     )
     parser.add_argument(
         "--sac-entropy-scaler",
         type=float,
-        default=5e-3,
+        default=1e-3,
         help="PPO policy entropy scaler",
     )
     parser.add_argument(
         "--ppo-entropy-scaler",
         type=float,
-        default=5e-3,
+        default=1e-3,
         help="PPO policy entropy scaler",
     )
 
@@ -432,20 +432,20 @@ def get_args(verbose=True):
         help="action dimension. For grid with 5 available actions, it is one-hotted to be 1 x 5.",
     )
     parser.add_argument(
+        "--sf-r-dim",
+        type=list,
+        default=None,
+        help="This is general fully connected dimension for most of network this code.",
+    )
+    parser.add_argument(
+        "--sf-s-dim",
+        type=list,
+        default=None,
+        help="This is general fully connected dimension for most of network this code.",
+    )
+    parser.add_argument(
         "--sf-fc-dim",
         type=int,
-        default=None,
-        help="This is general fully connected dimension for most of network this code.",
-    )
-    parser.add_argument(
-        "--feature-weights",
-        type=list,
-        default=None,
-        help="This is general fully connected dimension for most of network this code.",
-    )
-    parser.add_argument(
-        "--op-feature-weights",
-        type=list,
         default=None,
         help="This is general fully connected dimension for most of network this code.",
     )

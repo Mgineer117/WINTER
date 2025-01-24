@@ -301,7 +301,7 @@ def save_dim_to_args(env, args):
     elif isinstance(env.action_space, gym.spaces.Box):
         args.a_dim = int(env.action_space.shape[0])
     args.grid_size = int(args.s_dim[0])
-    args.num_weights = len(args.op_feature_weights)
+    args.num_weights = 2 * (args.sf_r_dim + args.sf_s_dim)
 
     print(f"Problem dimension (|S|/|A|): {args.s_dim}/{args.a_dim}")
     env.close()

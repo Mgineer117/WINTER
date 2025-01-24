@@ -69,10 +69,11 @@ class ConvNetwork(nn.Module):
         self,
         state_dim: tuple,
         action_dim: int,
+        sf_r_dim: int,
+        sf_s_dim: int,
         encoder_conv_layers: list,
         decoder_conv_layers: list,
         fc_dim: int = 256,
-        sf_dim: int = 256,
         activation: nn.Module = nn.ReLU(),
     ):
         super(ConvNetwork, self).__init__()
@@ -132,7 +133,7 @@ class ConvNetwork(nn.Module):
         self.encoder = MLP(
             input_dim=feature_input_dim,  # agent pos concat
             hidden_dims=(fc_dim, fc_dim),
-            output_dim=sf_dim,
+            output_dim=sf_r_dim + sf_s_dim,
             activation=self.act,
         )
 
@@ -145,7 +146,7 @@ class ConvNetwork(nn.Module):
         )
 
         self.de_state_feature = MLP(
-            input_dim=sf_dim,
+            input_dim=sf_s_dim,
             hidden_dims=(fc_dim,),
             activation=self.act,
         )

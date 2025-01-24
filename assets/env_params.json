@@ -25,6 +25,7 @@
         "ppo_critic_lr": 3e-4,
         "sac_policy_lr": 1e-4,
         "sac_critic_lr": 3e-4,
+        "sf_s_dim": 10,
         "sf_fc_dim": 512,
         "feature_weights": [
             1.0,
@@ -149,6 +150,7 @@
         "ppo_critic_lr": 3e-4,
         "sac_policy_lr": 1e-4,
         "sac_critic_lr": 3e-4,
+        "sf_s_dim": 10,
         "sf_fc_dim": 512,
         "feature_weights": [
             1.0,
@@ -273,86 +275,9 @@
         "ppo_critic_lr": 3e-4,
         "sac_policy_lr": 1e-4,
         "sac_critic_lr": 3e-4,
+        "sf_r_dim": 5,
+        "sf_s_dim": 10,
         "sf_fc_dim": 512,
-        "feature_weights": [
-            1.0,
-            0.5,
-            0.0,
-            -0.5,
-            -1.0
-        ],
-        "op_feature_weights": [
-            [
-                1.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0
-            ],
-            [
-                -1.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0
-            ],
-            [
-                0.0,
-                1.0,
-                0.0,
-                0.0,
-                0.0
-            ],
-            [
-                0.0,
-                -1.0,
-                0.0,
-                0.0,
-                0.0
-            ],
-            [
-                0.0,
-                0.0,
-                1.0,
-                0.0,
-                0.0
-            ],
-            [
-                0.0,
-                0.0,
-                -1.0,
-                0.0,
-                0.0
-            ],
-            [
-                0.0,
-                0.0,
-                0.0,
-                1.0,
-                0.0
-            ],
-            [
-                0.0,
-                0.0,
-                0.0,
-                -1.0,
-                0.0
-            ],
-            [
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                1.0
-            ],
-            [
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                -1.0
-            ]
-        ],
         "op_policy_dim": [
             64,
             64
@@ -439,6 +364,7 @@
         "ppo_critic_lr": 3e-4,
         "sac_policy_lr": 1e-4,
         "sac_critic_lr": 3e-4,
+        "sf_s_dim": 10,
         "sf_fc_dim": 512,
         "feature_weights": [
             1.0,
