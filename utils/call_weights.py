@@ -58,7 +58,7 @@ def call_feature_weights(sf_r_dim: int):
 def call_options(
     sf_r_dim: int,
     r_option_num: int,
-    sf_s_dim:int,
+    sf_s_dim: int,
     s_option_num: int,
     sf_network: LASSO,
     sampler: OnlineSampler,
@@ -80,7 +80,9 @@ def call_options(
         terminals = samples["terminals"]
 
         with torch.no_grad():
-            features = sf_network.get_features(states, deterministic=True, to_numpy=True)
+            features = sf_network.get_features(
+                states, deterministic=True, to_numpy=True
+            )
         _, features = sf_network.split(features, sf_network.sf_r_dim)
         psi = estimate_psi(features, terminals=terminals, gamma=gamma)
 
@@ -112,7 +114,9 @@ def call_options(
             top_n_V = V[:n]
             remainder_V = V[n:]
 
-            kmeans = KMeans(n_clusters=s_option_num-n, init="k-means++", random_state=42)
+            kmeans = KMeans(
+                n_clusters=s_option_num - n, init="k-means++", random_state=42
+            )
             kmeans.fit(remainder_V @ features.T)
             cluster_labels = kmeans.labels_
 
@@ -127,15 +131,13 @@ def call_options(
     else:
         state_options = None
 
-
     return reward_options, state_options
 
-def get_reward_maps(env: gym.Env,
-    sf_network: nn.Module,
-    V: list,
-    feature_dim: int,
-    grid_type:int):
-    
+
+def get_reward_maps(
+    env: gym.Env, sf_network: nn.Module, V: list, feature_dim: int, grid_type: int
+):
+
     grid_tensor, x_coords, y_coords = get_grid_and_coords(env, grid_type)
     random_indices = random.sample(range(len(x_coords)), 2)
     grid = grid_tensor.copy()
@@ -149,9 +151,15 @@ def get_reward_maps(env: gym.Env,
         & (grid[:, :, 1] != 2)
         & (grid[:, :, 1] != 3)
         & (grid[:, :, 1] != 4)
-    )    
+    )
 
-    img = plotRewardMap(sf_network=sf_network, grid_tensor=grid_tensor, V=V, feature_dim=feature_dim, coords=pos)
+    img = plotRewardMap(
+        sf_network=sf_network,
+        grid_tensor=grid_tensor,
+        V=V,
+        feature_dim=feature_dim,
+        coords=pos,
+    )
     return img
 
 
@@ -180,7 +188,7 @@ def get_grid_and_coords(env, grid_type):
 
 def plotRewardMap(
     sf_network: nn.Module,
-    grid_tensor:np.ndarray,
+    grid_tensor: np.ndarray,
     V: list,
     feature_dim: int,
     coords: tuple,
@@ -190,7 +198,6 @@ def plotRewardMap(
         if vector is not None:
             V[i] = torch.from_numpy(vector).to(torch.float32)
 
-
     ### Load parameters
     x_grid_dim, y_grid_dim, _ = grid_tensor.shape
     num_reward_options = V[0].shape[0] if V[0] is not None else 0
@@ -198,10 +205,10 @@ def plotRewardMap(
     agent_dirs = [0, 1, 2, 3]
     num_vec = num_reward_options + num_state_options
     sf_r_dim = sf_network.sf_r_dim
-    
+
     x_coords, y_coords = coords
     device_of_model = next(sf_network.parameters()).device
-    
+
     # create a placeholder
     features = torch.zeros(x_grid_dim, y_grid_dim, feature_dim)
     deltaPhi = torch.zeros(len(agent_dirs), x_grid_dim, y_grid_dim, feature_dim)
@@ -220,7 +227,7 @@ def plotRewardMap(
                 img = img.unsqueeze(0)
             phi = sf_network.get_features(img, deterministic=True)
         features[x, y, :] = phi
-    
+
     # ### COMPUTE DELTA-PHI
     # coordinates = np.stack((coords[0], coords[1]), axis=-1)
     # for agent_dir in agent_dirs:
@@ -259,10 +266,10 @@ def plotRewardMap(
     # # sum all connected next_phi - current phi
     # deltaPhi = torch.mean(deltaPhi, axis=0)  # [x, y, f]
     # deltaPhi -= features
-    # deltaPhi = features
+    deltaPhi = features
 
     r_deltaPhi, s_deltaPhi = deltaPhi[:, :, :sf_r_dim], deltaPhi[:, :, sf_r_dim:]
-    
+
     for vec_idx in range(num_vec):
         is_reward_option = True if vec_idx < num_reward_options else False
         if is_reward_option:
@@ -279,6 +286,7 @@ def plotRewardMap(
             )
 
         for x, y in zip(x_coords, y_coords):
+            print(rewards.shape, reward.shape)
             rewards[vec_idx, x, y] += reward[x, y]
 
     ### Normalization
@@ -296,9 +304,7 @@ def plotRewardMap(
             )
         # Normalize negative rewards to the range [-1, 0]
         if neg_rewards.any():  # Check if there are any negative rewards
-            r_neg_max = rewards[
-                k, neg_rewards
-            ].max()  # Closest to 0 (least negative)
+            r_neg_max = rewards[k, neg_rewards].max()  # Closest to 0 (least negative)
             r_neg_min = rewards[k, neg_rewards].min()  # Most negative
             rewards[k, neg_rewards] = (rewards[k, neg_rewards] - r_neg_max) / (
                 r_neg_max - r_neg_min + 1e-10
@@ -315,17 +321,15 @@ def plotRewardMap(
         (0.2667, 0.0039, 0.3294),
         (1, 0.2, 0.2),
     ]  # Blue -> Black -> Red
-    cmap = mcolors.LinearSegmentedColormap.from_list(
-        "pale_blue_dark_pale_red", colors
-    )
+    cmap = mcolors.LinearSegmentedColormap.from_list("pale_blue_dark_pale_red", colors)
 
     images = []
     walls = np.where(
-            (grid_tensor[:, :, 0] == 0)
-            | (grid_tensor[:, :, 1] == 2)
-            | (grid_tensor[:, :, 1] == 3)
-            | (grid_tensor[:, :, 1] == 4)
-        )
+        (grid_tensor[:, :, 0] == 0)
+        | (grid_tensor[:, :, 1] == 2)
+        | (grid_tensor[:, :, 1] == 3)
+        | (grid_tensor[:, :, 1] == 4)
+    )
     for i in range(num_vec):
         grid = np.zeros((x_grid_dim, y_grid_dim))
         grid += rewards[i, :, :]
@@ -334,9 +338,9 @@ def plotRewardMap(
             for x, y in zip(coords[0], coords[1]):
                 grid[x, y] += 1.0
         grid[walls] = 0.0
-    
+
         fig, ax = plt.subplots()
-        ax.imshow(grid, cmap=cmap, interpolation="nearest",vmin=-1,vmax=1)
+        ax.imshow(grid, cmap=cmap, interpolation="nearest", vmin=-1, vmax=1)
         plt.tight_layout()
 
         # Render the figure to a canvas
@@ -350,10 +354,8 @@ def plotRewardMap(
         )  # Shape: (height, width, 3)
         plt.close()
         images.append(reward_img)
-        i+= 1
+        i += 1
     return images
-
-
 
 
 def warm_buffer(
