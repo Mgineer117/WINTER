@@ -4,14 +4,14 @@ import torch
 import torch.nn as nn
 import numpy as np
 from scipy.stats import entropy
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+import seaborn as sns
 
 from utils.plotter import Plotter
 from log.wandb_logger import WandbLogger
 from models.evaulators.base_evaluator import Evaluator
 from torch.utils.tensorboard import SummaryWriter
-
-
-from PIL import Image, ImageDraw, ImageFont
 
 
 def add_number_to_raw_image(
@@ -92,12 +92,10 @@ class HC_Evaluator(Evaluator):
         dir: str = None,
         gridPlot: bool = True,
         renderPlot: bool = False,
-        render_fps: int = 10,
         max_option_length: int = 3,
         gamma: float = 0.99,
-        eval_ep_num: int = 1,
+        eval_ep_num: int = 10,
         episode_len: int = 100,
-        log_interval: int = 1,
     ):
         super(HC_Evaluator, self).__init__(
             logger=logger,
@@ -105,10 +103,8 @@ class HC_Evaluator(Evaluator):
             training_env=training_env,
             testing_env=testing_env,
             eval_ep_num=eval_ep_num,
-            log_interval=log_interval,
         )
         self.plotter = plotter
-        self.render_fps = render_fps
         self.gamma = gamma
         self.max_option_length = max_option_length
         self.episode_len = episode_len
@@ -121,6 +117,7 @@ class HC_Evaluator(Evaluator):
                     os.mkdir(self.gridDir)
                 self.path = []
                 self.path_marker = []
+                self.option_indices = {"x": [], "y": []}
             else:
                 self.gridPlot = False
             if renderPlot:
@@ -139,30 +136,20 @@ class HC_Evaluator(Evaluator):
         self,
         env,
         policy: nn.Module,
-        epoch: int,
         idx: int = None,
-        name1: str = None,
-        name2: str = None,
-        name3: str = None,
         grid_type: int = 0,
-        seed: int = None,
-        queue=None,
     ) -> dict[str, list[float]]:
+
         ep_buffer = []
-
-        # For each episode, apply different seed for stochasticity
-        if seed is None:
-            seed = random.randint(0, 1_000_000)
-
-        if queue is not None:
-            self.set_any_seed(grid_type, seed)
+        path_image = None  # placeholder
+        path_render = None  # placeholder
 
         def env_step(a, is_option: bool = False):
             next_obs, rew, term, trunc1, infos = env.step(a)
 
-            if self.gridCriteria:
+            if num_episodes == 0 and self.gridPlot:
                 self.get_agent_pos(env, is_option=is_option)
-            if self.renderCriteria:
+            if num_episodes == 0 and self.renderPlot:
                 img = env.render()
                 img = add_number_to_raw_image(
                     img,
@@ -183,8 +170,6 @@ class HC_Evaluator(Evaluator):
         successes = np.zeros((self.eval_ep_num,))
         failures = np.zeros((self.eval_ep_num,))
         for num_episodes in range(self.eval_ep_num):
-            self.update_render_criteria(epoch, num_episodes)
-
             # logging initialization
             ep_reward = 0
 
@@ -192,11 +177,9 @@ class HC_Evaluator(Evaluator):
             options = {"random_init_pos": False}
             obs, _ = env.reset(seed=grid_type, options=options)
 
-            if self.gridCriteria:
+            if num_episodes == 0 and self.gridPlot:
                 self.init_grid(env)
-                self.get_agent_pos(env)
 
-            option_indices = {"x": [], "y": []}
             done = False
             self.external_t = 1
             while not done:
@@ -204,8 +187,8 @@ class HC_Evaluator(Evaluator):
                     a, metaData = policy(obs, idx, deterministic=False)
                     a = a.cpu().numpy().squeeze() if a.shape[-1] > 1 else [a.item()]
 
-                option_indices["x"].append(self.external_t)
-                option_indices["y"].append(metaData["z_argmax"].numpy())
+                self.option_indices["x"].append(self.external_t)
+                self.option_indices["y"].append(metaData["z_argmax"].numpy())
 
                 ### Create an Option Loop
                 if metaData["is_option"]:
@@ -247,7 +230,7 @@ class HC_Evaluator(Evaluator):
 
                 if done:
                     dist, ep_entropy = compute_categorical_entropy(
-                        option_indices["y"], policy._a_dim
+                        self.option_indices["y"], policy._a_dim
                     )
 
                     ep_buffer.append(
@@ -258,37 +241,19 @@ class HC_Evaluator(Evaluator):
                         }
                     )
 
-                    if self.gridCriteria:
+                    if num_episodes == 0 and self.gridPlot:
                         # final agent pos
                         self.get_agent_pos(env)
-
-                        self.plotter.plotPath(
-                            self.grid,
-                            self.path,
-                            dir=self.gridDir,
-                            epoch=str(epoch),
-                            path_marker=self.path_marker,
-                        )
+                        
+                        path_image = self.plotPath()
                         self.path = []
-                        self.path_marker = []
 
                         # save option indices
-                        self.plotter.plotOptionIndices(
-                            option_indices, dir=self.plotter.hc_path, epoch=epoch
-                        )
+                        option_image = self.plotOptionIndices()
+                        self.option_indices = {"x": [], "y": []}
 
-                    if self.renderCriteria:
-                        # save rendering
-                        width = self.recorded_frames[0].shape[0]
-                        height = self.recorded_frames[0].shape[1]
-                        self.plotter.plotRendering(
-                            self.recorded_frames,
-                            dir=self.renderDir,
-                            epoch=str(epoch),
-                            width=width,
-                            height=height,
-                            fps=self.render_fps,
-                        )
+                    if num_episodes == 0 and self.renderPlot:
+                        path_render = self.plotRender()
                         self.recorded_frames = []
 
         reward_list = [ep_info["ep_reward"] for ep_info in ep_buffer]
@@ -314,21 +279,107 @@ class HC_Evaluator(Evaluator):
             "failRate_std": failRate_std,
         }
 
-        if queue is not None:
-            queue.put([eval_dict])
-        else:
-            return eval_dict
+        supp_dict = {
+            "path_image": path_image,
+            "path_render": path_render,
+            "option_image": option_image,
+        }
 
-    def update_render_criteria(self, epoch, num_episodes):
-        basisCriteria = epoch % self.log_interval == 0 and num_episodes == 0
-        self.gridCriteria = basisCriteria and self.gridPlot
-        self.renderCriteria = basisCriteria and self.renderPlot
+        return eval_dict, supp_dict
+
+    def plotPath(self):
+        grid = self.grid
+        path = self.path
+        path_marker = None
+        img_tile_size = 32
+
+        # Rotate the grid and set up the figure
+        grid = np.rot90(grid, k=1)
+        fig, ax = plt.subplots(figsize=(8, 8))
+        ax.imshow(grid, origin="upper")
+        ax.axis("off")
+
+        img_size = grid.shape[0]
+        path_length = len(path) - 1
+
+        for idx, (i_point, f_point) in enumerate(zip(path[:-1], path[1:])):
+            # Calculate coordinates
+            y = [(p[0] * img_tile_size + img_tile_size / 2) for p in [i_point, f_point]]
+            x = [(p[1] * img_tile_size + img_tile_size / 2) for p in [i_point, f_point]]
+            y = [img_size - yi for yi in y]
+
+            # Plot path components
+            if idx == 0:
+                ax.scatter(x[0], y[0], color="red", s=30)  # Start point
+            if idx == path_length:
+                ax.scatter(x[1], y[1], color="blue", s=30)  # End point
+            if path_marker and path_marker[idx]:
+                ax.scatter(
+                    x[0],
+                    y[0],
+                    color="yellow",
+                    marker="*",
+                    s=100,
+                    edgecolors="black",
+                    linewidths=1.0,
+                )
+            if (i_point != f_point).any():
+                ax.plot(x, y, color="green", linewidth=2)  # Path line
+
+        # Convert figure to a NumPy array
+        canvas = FigureCanvas(fig)
+        canvas.draw()
+        img = np.frombuffer(canvas.tostring_rgb(), dtype="uint8")
+        img = img.reshape(
+            canvas.get_width_height()[::-1] + (3,)
+        )  # Shape: (height, width, 3)
+
+        plt.close(fig)
+        return img
+
+    def plotRender(self):
+        # Assuming self.recorded_frames is a list of frames, where each frame is a 2D or 3D array
+        frames = []
+
+        for frame in self.recorded_frames:
+            # Ensure the frame is a NumPy array
+            frame = np.array(frame)
+
+            # Handle grayscale frames (2D arrays), convert to RGB
+            if frame.ndim == 2:
+                frame = np.stack([frame] * 3, axis=2)  # Convert to (H, W, 3)
+
+            frames.append(frame)
+
+        # Stack all frames into a single NumPy array (N, C, H, W)
+        frames = np.stack(frames, axis=0)
+
+        # Example: You can now use frames with wandb.Video
+        return frames
+
+    def plotOptionIndices(self):
+        sns.set_theme()
+
+        option_indices = self.option_indices
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.scatter(option_indices["x"], option_indices["y"])
+
+        # Convert figure to a NumPy array
+        canvas = FigureCanvas(fig)
+        canvas.draw()
+        img = np.frombuffer(canvas.tostring_rgb(), dtype="uint8")
+        img = img.reshape(
+            canvas.get_width_height()[::-1] + (3,)
+        )  # Shape: (height, width, 3)
+
+        plt.close()
+        return img
 
     def init_grid(self, env):
         self.grid = np.copy(env.render()).astype(np.float32) / 255.0
 
     def get_agent_pos(self, env, is_option: bool = False):
         # Update the grid
-        if self.gridCriteria:
-            self.path.append(env.get_agent_pos())
-            self.path_marker.append(is_option)
+        self.path.append(env.get_agent_pos())
+        self.path_marker.append(is_option)

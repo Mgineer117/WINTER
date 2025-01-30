@@ -95,8 +95,12 @@ class BasePolicy(nn.Module):
     def discover_options(self):
         pass
 
-    def split(self, x, num_reward_features: int):
-        x_r, x_s = x[:num_reward_features], x[num_reward_features:]
+    def split(self, x:torch.Tensor, num_reward_features: int):
+        if len(x.shape) == 1:
+            x_r, x_s = x[:num_reward_features], x[num_reward_features:]
+        else:
+            x_r, x_s = x[:, :num_reward_features], x[:, num_reward_features:]
+        
         return x_r, x_s
 
     def get_features(self):

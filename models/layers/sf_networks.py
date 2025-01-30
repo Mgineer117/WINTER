@@ -80,6 +80,9 @@ class ConvNetwork(nn.Module):
 
         s_dim, _, in_channels = state_dim
 
+        self.sf_r_dim = sf_r_dim
+        self.sf_s_dim = sf_s_dim
+
         # Activation functions
         self.act = activation
 
@@ -145,8 +148,8 @@ class ConvNetwork(nn.Module):
             input_dim=action_dim, hidden_dims=(fc_dim,), activation=self.act
         )
 
-        self.de_state_feature = MLP(
-            input_dim=sf_s_dim,
+        self.de_feature = MLP(
+            input_dim=sf_r_dim + sf_s_dim,
             hidden_dims=(fc_dim,),
             activation=self.act,
         )
@@ -232,48 +235,28 @@ class ConvNetwork(nn.Module):
             feature: latent representations of the given state
         """
         # forward method
-        indices = []
-        sizes = []
-
         out = self.en_pmt(state)
 
         for fn in self.conv:
-            output_dim = out.shape
             out, info = fn(out)
-            if isinstance(fn, nn.MaxPool2d):
-                indices.append(info)
-                sizes.append(output_dim)
 
         out = self.en_flatter(out)
         out = self.en_feature(out)
         out = self.encoder(out)
         features = self.en_last_act(out)
-        return features, {
-            "indices": indices,
-            "output_dim": sizes,
-            "loss": torch.tensor(0.0),
-        }
+        return features, {}
 
-    def decode(self, features, actions, conv_dict):
+    def decode(self, features, actions):
         """This reconstruct full state given phi_state and actions"""
-
-        indices = conv_dict["indices"][::-1]  # indices should be backward
-        output_dim = conv_dict["output_dim"][::-1]  # to keep dim correct
-
-        features = self.de_state_feature(features)
+        features = self.de_feature(features)
         actions = self.de_action(actions)
 
         out = torch.cat((features, actions), axis=-1)
         out = self.de_concat(out)
         out = self.reshape(out)
 
-        i = 0
         for fn in self.de_conv:
-            if isinstance(fn, nn.MaxUnpool2d):
-                out = fn(out, indices[i], output_size=output_dim[i])
-                i += 1
-            else:
-                out, _ = fn(out)
+            out, _ = fn(out)
         out = self.de_last_act(out)
         reconstructed_state = self.de_pmt(out)
         return reconstructed_state

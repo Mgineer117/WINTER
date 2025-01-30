@@ -36,7 +36,7 @@ def get_args(verbose=True):
 
     ### WandB and Logging parameters
     parser.add_argument(
-        "--project", type=str, default="Test", help="WandB project classification"
+        "--project", type=str, default="Exp", help="WandB project classification"
     )
     parser.add_argument(
         "--logdir", type=str, default="log/train_log", help="name of the logging folder"
@@ -94,7 +94,7 @@ def get_args(verbose=True):
     parser.add_argument(
         "--env-name",
         type=str,
-        default="OneRoom",
+        default="CtF",
         help="This specifies which environment one is working with= FourRooms or CtF1v1, CtF1v2}",
     )
     parser.add_argument(
@@ -166,31 +166,31 @@ def get_args(verbose=True):
         help="total number of epochs for SFs training",
     )
     parser.add_argument(
-        "--OP-epoch",
+        "--OP-timesteps",
         type=int,
         default=None,  # 500
         help="total number of epochs for OP training",
     )
     parser.add_argument(
-        "--HC-epoch",
+        "--HC-timesteps",
         type=int,
         default=None,  # 500
         help="total number of epochs for HC training",
     )
     parser.add_argument(
-        "--OC-epoch",
+        "--OC-timesteps",
         type=int,
         default=None,  # 500
         help="total number of epochs for OC training",
     )
     parser.add_argument(
-        "--PPO-epoch",
+        "--PPO-timesteps",
         type=int,
         default=None,  # 500
         help="total number of epochs for OC training",
     )
     parser.add_argument(
-        "--SAC-epoch",
+        "--SAC-timesteps",
         type=int,
         default=None,  # 500
         help="total number of epochs for SAC training",
@@ -350,25 +350,25 @@ def get_args(verbose=True):
     parser.add_argument(
         "--op-entropy-scaler",
         type=float,
-        default=1e-3,
+        default=1e-4,
         help="Option policy entropy scaler",
     )
     parser.add_argument(
         "--hc-entropy-scaler",
         type=float,
-        default=5e-3,
+        default=5e-4,
         help="Hierarchical policy entropy scaler",
     )
     parser.add_argument(
         "--sac-entropy-scaler",
         type=float,
-        default=1e-3,
+        default=1e-4,
         help="PPO policy entropy scaler",
     )
     parser.add_argument(
         "--ppo-entropy-scaler",
         type=float,
-        default=1e-3,
+        default=1e-4,
         help="PPO policy entropy scaler",
     )
 
@@ -432,14 +432,32 @@ def get_args(verbose=True):
         help="action dimension. For grid with 5 available actions, it is one-hotted to be 1 x 5.",
     )
     parser.add_argument(
+        "--method",
+        type=str,
+        default=None,
+        help="This is general fully connected dimension for most of network this code.",
+    )
+    parser.add_argument(
         "--sf-r-dim",
-        type=list,
+        type=int,
+        default=None,
+        help="This is general fully connected dimension for most of network this code.",
+    )
+    parser.add_argument(
+        "--r-option-num",
+        type=int,
         default=None,
         help="This is general fully connected dimension for most of network this code.",
     )
     parser.add_argument(
         "--sf-s-dim",
-        type=list,
+        type=int,
+        default=None,
+        help="This is general fully connected dimension for most of network this code.",
+    )
+    parser.add_argument(
+        "--s-option-num",
+        type=int,
         default=None,
         help="This is general fully connected dimension for most of network this code.",
     )

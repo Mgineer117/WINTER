@@ -26,7 +26,7 @@ class PPO:
             training_envs=self.env,
             state_dim=args.s_dim,
             action_dim=args.a_dim,
-            hc_action_dim=len(args.feature_weights),
+            hc_action_dim=args.num_weights + 1,
             max_option_length=args.max_option_length,
             episode_len=args.episode_len,
             batch_size=total_batch_size,
@@ -76,10 +76,8 @@ class PPO:
             training_env=self.env,
             plotter=self.plotter,
             renderPlot=args.rendering,
-            render_fps=args.render_fps,
             dir=self.ppo_path,
-            log_interval=args.ppo_log_interval,
-            eval_ep_num=10,
+            eval_ep_num=args.eval_episodes,
         )
 
     def run(self):
@@ -97,10 +95,7 @@ class PPO:
                 logger=self.logger,
                 writer=self.writer,
                 evaluator=self.ppo_evaluator,
-                epoch=self.curr_epoch + self.args.PPO_epoch,
-                init_epoch=self.curr_epoch,
-                step_per_epoch=self.args.step_per_epoch,
-                eval_episodes=self.args.eval_episodes,
+                timesteps=self.curr_epoch + self.args.PPO_timesteps,
                 log_interval=self.args.ppo_log_interval,
                 grid_type=self.args.grid_type,
             )

@@ -47,7 +47,6 @@ class Evaluator:
         training_env,
         testing_env=None,
         eval_ep_num: int = 1,
-        log_interval: int = 1,
     ):
         # store envs for evaluation
         if testing_env is not None:
@@ -62,20 +61,11 @@ class Evaluator:
         self.writer = writer
 
         self.eval_ep_num = eval_ep_num
-        self.log_interval = log_interval
 
     def __call__(
         self,
         policy: nn.Module,
-        env_step: int = 0,
-        epoch: int = 0,
-        iter_idx: int = 0,
         idx: int = None,
-        dir_name: str = "eval",
-        name1: str = None,
-        name2: str = None,
-        name3: str = None,
-        write_log: bool = True,
         grid_type: int = 0,
     ) -> Dict[str, List[float]]:
         """
@@ -97,97 +87,30 @@ class Evaluator:
             policy.to_device(torch.device("cpu"))
             all_devices = check_all_devices(policy)
 
-        dict_list = []
+        eval_dict_list = []
+        supp_dict_list = []
 
-        if self.renderPlot:
-            """
-            Using Multiprocessing crashes graphic rendering process, so we iterate all envs one by one
-            """
-            for i, env in enumerate(self.envs):
-                eval_dict = self.eval_loop(
-                    env,
-                    policy,
-                    epoch,
-                    idx=idx,
-                    name1=name1,
-                    name2=name2,
-                    name3=name3,
-                    queue=None,
-                    grid_type=grid_type,
-                    seed=i,
-                )
-                dict_list.append(eval_dict)
-        else:
-            queue = multiprocessing.Manager().Queue()
-            processes = []
+        # Using Multiprocessing crashes graphic rendering process, so we iterate all envs one by one
+        for i, env in enumerate(self.envs):
+            eval_dict, supp_dict = self.eval_loop(
+                env,
+                policy,
+                idx=idx,
+                grid_type=grid_type,
+            )
+            eval_dict_list.append(eval_dict)
+            supp_dict_list.append(supp_dict)
 
-            for i, env in enumerate(self.envs):
-                if i == len(self.envs) - 1:
-                    """Main thread process"""
-                    eval_dict = self.eval_loop(
-                        env,
-                        policy,
-                        epoch,
-                        idx=idx,
-                        name1=name1,
-                        name2=name2,
-                        name3=name3,
-                        queue=None,
-                        grid_type=grid_type,
-                        seed=i,
-                    )
-                    dict_list.append(eval_dict)
-                else:
-                    """Sub-thread process"""
-                    p = multiprocessing.Process(
-                        target=self.eval_loop,
-                        args=(
-                            env,
-                            policy,
-                            epoch,
-                            idx,
-                            name1,
-                            name2,
-                            name3,
-                            grid_type,
-                            i,
-                            queue,
-                        ),
-                    )
-                    processes.append(p)
-                    p.start()
+        eval_dict = self.average_dict_values(eval_dict_list)
+        supp_dict = self.average_dict_values(supp_dict_list)
 
-            for p in processes:
-                p.join()
-
-            for _ in range(i):
-                eval_dict = queue.get()
-                dict_list.append(eval_dict)
-
-        eval_dict = self.average_dict_values(dict_list)
-
-        summary_dict = {}
-        summary_dict[dir_name + "/" + "num_env_steps"] = env_step
-        for k, v in eval_dict.items():
-            summary_dict[dir_name + "/" + k] = v
-
-        if write_log:
-            self.write_log(summary_dict, iter_idx)
-
-        if isinstance(policy, List):
+        if isinstance(policy, list):
             for p in policy:
                 p.to_device(policy_device)
         else:
             policy.to_device(policy_device)
 
-        return eval_dict
-
-    def write_log(self, logging_dict: dict, iter_idx: int):
-        # Logging to WandB and Tensorboard
-        self.logger.store(**logging_dict)
-        self.logger.write(int(iter_idx), eval_log=True, display=False)
-        for key, value in logging_dict.items():
-            self.writer.add_scalar(key, value, int(iter_idx))
+        return eval_dict, supp_dict
 
     def set_any_seed(self, grid_type, seed):
         """
@@ -207,15 +130,20 @@ class Evaluator:
         if not dict_list:
             return {}
 
-        # Initialize a dictionary to hold the sum of values for each key
-        sum_dict = {key: 0 for key in dict_list[0].keys()}
+        if len(dict_list) == 1:
+            return dict_list[0]
+        else:
+            # Initialize a dictionary to hold the sum of values for each key
+            sum_dict = {key: 0 for key in dict_list[0].keys()}
 
-        # Iterate over each dictionary in the list
-        for d in dict_list:
-            for key, value in d.items():
-                sum_dict[key] += value
+            # Iterate over each dictionary in the list
+            for d in dict_list:
+                for key, value in d.items():
+                    sum_dict[key] += value
 
-        # Calculate the average for each key
-        avg_dict = {key: sum_val / len(dict_list) for key, sum_val in sum_dict.items()}
+            # Calculate the average for each key
+            avg_dict = {
+                key: sum_val / len(dict_list) for key, sum_val in sum_dict.items()
+            }
 
-        return avg_dict
+            return avg_dict

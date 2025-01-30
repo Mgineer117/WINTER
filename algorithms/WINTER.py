@@ -1,16 +1,16 @@
 import torch
 import torch.nn as nn
-import uuid
 import numpy as np
-import matplotlib.pyplot as plt
 import gymnasium as gym
 
+from log.wandb_logger import WandbLogger
 from models.evaulators import (
     OP_Evaluator,
     HC_Evaluator,
 )
 from models import OPTrainer, HCTrainer
 from utils import *
+from utils.call_weights import get_reward_maps
 
 
 class WINTER:
@@ -18,8 +18,7 @@ class WINTER:
         self,
         env: gym.Env,
         sf_network: nn.Module,
-        prev_epoch: int,
-        logger,
+        logger: WandbLogger,
         writer,
         reward_options: np.ndarray,
         state_options: np.ndarray,
@@ -74,7 +73,11 @@ class WINTER:
         self.args = args
 
         # param initialization
-        self.curr_epoch = prev_epoch
+        self.curr_timesteps = args.SF_epoch * args.step_per_epoch
+
+        images = get_reward_maps(env=env, sf_network=sf_network, V=[reward_options, state_options], feature_dim=args.sf_r_dim+args.sf_s_dim,grid_type=args.grid_type)
+        self.logger.write_images(
+            step=self.curr_timesteps, images=images, log_dir="RewardMap/Options")
 
         # SF checkpoint b/c plotter will only be used
         (
@@ -108,7 +111,6 @@ class WINTER:
             "plotter": self.plotter,
             "gridPlot": True,
             "renderPlot": args.rendering,
-            "render_fps": args.render_fps,
             "eval_ep_num": args.eval_episodes,
         }
 
@@ -116,11 +118,10 @@ class WINTER:
             evaluator_params.update({"gridPlot": False})
 
         self.op_evaluator = OP_Evaluator(
-            dir=self.op_path, log_interval=args.op_log_interval, **evaluator_params
+            dir=self.op_path, **evaluator_params
         )
         self.hc_evaluator = HC_Evaluator(
             dir=self.hc_path,
-            log_interval=args.hc_log_interval,
             max_option_length=args.max_option_length,
             **evaluator_params,
         )
@@ -154,21 +155,17 @@ class WINTER:
                 evaluator=self.op_evaluator,
                 num_weights=self.args.num_weights,
                 mode=self.args.op_mode,
-                epoch=self.curr_epoch + self.args.OP_epoch,
-                init_epoch=self.curr_epoch,
-                step_per_epoch=self.args.step_per_epoch,
+                timesteps=self.args.OP_timesteps,
+                init_timesteps=self.curr_timesteps,
                 batch_size=self.args.op_batch_size,
-                eval_episodes=self.args.eval_episodes,
                 log_interval=self.args.op_log_interval,
                 grid_type=self.args.grid_type,
             )
 
-            final_epoch = op_trainer.train()
-
+            self.curr_timesteps = op_trainer.train()
         else:
             self.op_network = call_opNetwork(self.sf_network, self.args)
-            final_epoch = self.curr_epoch + self.args.OP_epoch
-        self.curr_epoch += final_epoch
+            self.curr_timesteps = self.curr_timesteps + self.args.OP_timesteps
 
     def train_hc(self):
         """
@@ -187,13 +184,9 @@ class WINTER:
                 logger=self.logger,
                 writer=self.writer,
                 evaluator=self.hc_evaluator,
-                prefix="HC",
-                epoch=self.curr_epoch + self.args.HC_epoch,
-                init_epoch=self.curr_epoch,
-                step_per_epoch=self.args.step_per_epoch,
-                eval_episodes=self.args.eval_episodes,
+                timesteps=self.args.HC_timesteps,
+                init_timesteps=self.curr_timesteps,
                 log_interval=self.args.hc_log_interval,
                 grid_type=self.args.grid_type,
             )
             hc_trainer.train()
-        self.curr_epoch += self.args.HC_epoch

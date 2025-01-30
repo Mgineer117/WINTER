@@ -24,15 +24,10 @@ class SF_Evaluator(Evaluator):
         writer: SummaryWriter,
         training_env,
         plotter: Plotter,
-        testing_env=None,
+        testing_env: None = None,
         dir: str = None,
-        eigenPlot: bool = False,
-        gridPlot: bool = False,
         featurePlot: bool = False,
-        renderPlot: bool = False,
-        render_fps: int = 10,
         eval_ep_num: int = 1,
-        log_interval: int = 1,
     ):
         super().__init__(
             logger=logger,
@@ -40,61 +35,10 @@ class SF_Evaluator(Evaluator):
             training_env=training_env,
             testing_env=testing_env,
             eval_ep_num=eval_ep_num,
-            log_interval=log_interval,
         )
         self.plotter = plotter
-        self.render_fps = render_fps
 
         if dir is not None:
-            if eigenPlot:
-                self.eigenPlot = True
-                self.eigenDir = os.path.join(dir, "eigen")
-                if os.path.exists(self.eigenDir):
-                    warning_msg = colorize(
-                        "Warning: Log dir %s already exists! Some logs may be overwritten."
-                        % self.eigenDir,
-                        "magenta",
-                        True,
-                    )
-                    print(warning_msg)
-                else:
-                    os.mkdir(self.eigenDir)
-            else:
-                self.eigenPlot = False
-            if gridPlot:
-                self.gridPlot = True
-                self.gridDir = os.path.join(dir, "grid")
-                if os.path.exists(self.gridDir):
-                    warning_msg = colorize(
-                        "Warning: Log dir %s already exists! Some logs may be overwritten."
-                        % self.gridDir,
-                        "magenta",
-                        True,
-                    )
-                    print(warning_msg)
-                else:
-                    os.mkdir(self.gridDir)
-            else:
-                self.gridPlot = False
-
-            if renderPlot:
-                ### video rendering
-                self.renderPlot = True
-                self.renderDir = os.path.join(dir, "render")
-                if os.path.exists(self.renderDir):
-                    warning_msg = colorize(
-                        "Warning: Log dir %s already exists! Some logs may be overwritten."
-                        % self.renderDir,
-                        "magenta",
-                        True,
-                    )
-                    print(warning_msg)
-                else:
-                    os.mkdir(self.renderDir)
-                self.render_frames = []
-            else:
-                self.renderPlot = False
-
             if featurePlot:
                 ### feature rendering
                 self.featurePlot = True
@@ -113,9 +57,6 @@ class SF_Evaluator(Evaluator):
             else:
                 self.featurePlot = False
         else:
-            self.eigenPlot = False
-            self.gridPlot = False
-            self.renderPlot = False
             self.featurePlot = False
 
     def eval_loop(

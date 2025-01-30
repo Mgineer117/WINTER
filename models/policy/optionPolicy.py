@@ -28,6 +28,8 @@ class OP_Controller(BasePolicy):
         sf_network: BasePolicy,
         policy: OptionPolicy,
         critic: OptionCritic,
+        sf_r_dim: int,
+        sf_s_dim: int,
         reward_options: np.ndarray,
         state_options: np.ndarray,
         alpha: int,
@@ -48,14 +50,27 @@ class OP_Controller(BasePolicy):
         self.device = args.device
 
         # algorithmic commons
-        self.reward_options = nn.Parameter(torch.tensor(reward_options)).to(
-            dtype=self._dtype, device=self.device
-        )
-        self.state_options = nn.Parameter(torch.tensor(state_options)).to(
-            dtype=self._dtype, device=self.device
-        )
+        self.sf_r_dim = sf_r_dim
+        self.sf_s_dim = sf_s_dim
 
-        self.num_weights = reward_options.shape[0] + state_options.shape[0]
+        if reward_options is not None:
+            self.reward_options = nn.Parameter(torch.tensor(reward_options)).to(
+                dtype=self._dtype, device=self.device
+            )
+            self.num_reward_options = reward_options.shape[0]
+        else:
+            self.reward_options = None
+            self.num_reward_options = 0
+        if state_options is not None:
+            self.state_options = nn.Parameter(torch.tensor(state_options)).to(
+                dtype=self._dtype, device=self.device
+            )
+            self.num_state_options = state_options.shape[0]
+        else:
+            self.state_options = None
+            self.num_state_options = 0
+
+        self.num_weights = self.num_reward_options + self.num_state_options
 
         # params for training
         self.optimizers = {}
@@ -149,25 +164,25 @@ class OP_Controller(BasePolicy):
 
     def learn(self, batch, z):
         if self.mode == "ppo":
-            loss_dict, update_time = self.ppo_learn(batch, z)
+            loss_dict, op_timesteps, update_time = self.ppo_learn(batch, z)
         elif self.mode == "sac":
-            loss_dict, update_time = self.sac_learn(batch, z)
-        return loss_dict, update_time
+            loss_dict, op_timesteps, update_time = self.sac_learn(batch, z)
+        return loss_dict, op_timesteps, update_time
 
     def psuedo_reward(self, states, next_states, z):
-        obs = {"observation": states}
-        next_obs = {"observation": next_states}
+        with torch.no_grad():
+            phi = self.sf_network.get_features(states, deterministic=True)
+            next_phi = self.sf_network.get_features(next_states, deterministic=True)
+            deltaPhi = next_phi - phi
 
-        phi = self.sf_network.get_features(obs)
-        next_phi = self.sf_network.get_features(next_obs)
+        is_reward_option = True if z < self.num_reward_options else False
 
-        deltaPhi = next_phi - phi
-        if z < self.reward_options.shape[0]:
-            deltaPhi, _ = self.split(deltaPhi, self.reward_options.shape[0])
+        if is_reward_option:
+            deltaPhi, _ = self.split(deltaPhi, self.sf_r_dim)
             weight = self.reward_options[z]
         else:
             z = z - self.reward_options.shape[0]
-            _, deltaPhi = self.split(deltaPhi, self.reward_options.shape[0])
+            _, deltaPhi = self.split(deltaPhi, self.sf_r_dim)
             weight = self.state_options[z]
 
         pseudo_rewards = self.multiply_weights(deltaPhi, weight)
@@ -321,7 +336,7 @@ class OP_Controller(BasePolicy):
         old_logprobs = to_tensor(batch["logprobs"])
 
         # batch processing
-        rewards = self.psudo_reward(states, next_states, z)
+        rewards = self.psuedo_reward(states, next_states, z)
         states = states.reshape(states.shape[0], -1)
         next_states = next_states.reshape(next_states.shape[0], -1)
 
@@ -452,11 +467,12 @@ class OP_Controller(BasePolicy):
         )
         torch.cuda.empty_cache()
 
-        t1 = time.time()
         self.eval()
+
+        timesteps = self._minibatch_size * (k + 1)
+        update_time = time.time() - t0
         return (
-            loss_dict,
-            t1 - t0,
+            loss_dict, timesteps, update_time
         )
 
     def average_dict_values(self, dict_list):
@@ -479,8 +495,9 @@ class OP_Controller(BasePolicy):
     def save_model(self, logdir, epoch=None, is_best=False):
         self.policy = self.policy.cpu()
         self.critic = self.critic.cpu()
-        reward_options = self.reward_options.clone().cpu().numpy()
-        state_options = self.state_options.clone().cpu().numpy()
+        reward_options = self.reward_options.detach().clone().cpu().numpy()
+        state_options = self.state_options.detach().clone().cpu().numpy() if self.state_options is not None else self.state_options
+
 
         # save checkpoint
         if is_best:

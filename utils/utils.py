@@ -301,7 +301,7 @@ def save_dim_to_args(env, args):
     elif isinstance(env.action_space, gym.spaces.Box):
         args.a_dim = int(env.action_space.shape[0])
     args.grid_size = int(args.s_dim[0])
-    args.num_weights = 2 * (args.sf_r_dim + args.sf_s_dim)
+    args.num_weights = 2 * (args.r_option_num + args.s_option_num*int(args.sf_s_dim != 0))
 
     print(f"Problem dimension (|S|/|A|): {args.s_dim}/{args.a_dim}")
     env.close()
@@ -369,14 +369,51 @@ def estimate_advantages(
     return advantages, returns
 
 
-def estimate_psi(phi, terminals, gamma, device=torch.device("cpu")):
-    phi, terminals = (phi.to(torch.device("cpu")), terminals.to(torch.device("cpu")))
+def estimate_psi(phi, terminals, gamma, device=torch.device("cpu"), mode="numpy"):
+    """
+    Estimates psi using either PyTorch or NumPy.
 
-    psi = torch.zeros(phi.shape)
+    Args:
+        phi: Torch tensor or NumPy array of features.
+        terminals: Torch tensor or NumPy array indicating terminal states.
+        gamma: Discount factor.
+        device: Torch device (only used in torch mode).
+        mode: "torch" for PyTorch version, "numpy" for NumPy version.
 
-    prev_psi = 0
-    for i in reversed(range(phi.size(0))):
-        psi[i] = phi[i] + gamma * prev_psi * (1 - terminals[i])
-        prev_psi = psi[i]
+    Returns:
+        psi: Computed psi values as a Torch tensor or NumPy array.
+    """
+    if mode == "torch":
+        # Ensure tensors are on the CPU for computation
+        phi, terminals = phi.to("cpu"), terminals.to("cpu")
 
-    return psi.to(device)
+        # Initialize psi
+        psi = torch.zeros_like(phi)
+
+        prev_psi = 0
+        for i in reversed(range(phi.size(0))):
+            psi[i] = phi[i] + gamma * prev_psi * (1 - terminals[i])
+            prev_psi = psi[i]
+
+        # Return psi to the requested device
+        return psi.to(device)
+
+    elif mode == "numpy":
+        # Ensure inputs are NumPy arrays
+        if isinstance(phi, torch.Tensor):
+            phi = phi.cpu().numpy()
+        if isinstance(terminals, torch.Tensor):
+            terminals = terminals.cpu().numpy()
+
+        # Initialize psi
+        psi = np.zeros_like(phi)
+
+        prev_psi = 0
+        for i in reversed(range(phi.shape[0])):
+            psi[i] = phi[i] + gamma * prev_psi * (1 - terminals[i])
+            prev_psi = psi[i]
+
+        return psi
+
+    else:
+        raise ValueError("Invalid mode. Choose 'torch' or 'numpy'.")

@@ -182,7 +182,7 @@ class HC_Controller(BasePolicy):
             "entropy": metaData["entropy"],
         }
 
-    def learn(self, batch, prefix="HC"):
+    def learn(self, batch):
         self.train()
         t0 = time.time()
 
@@ -319,27 +319,27 @@ class HC_Controller(BasePolicy):
             grad_dict = self.compute_gradient_norm(
                 [self.policy, self.primitivePolicy, self.critic],
                 ["policy", "primitivePolicy", "critic"],
-                dir=prefix,
+                dir="HC",
                 device=self.device,
             )
             self.optimizers.step()
 
         # Logging
         loss_dict = {
-            f"{prefix}/loss": np.mean(losses),
-            f"{prefix}/actor_loss": np.mean(actor_losses),
-            f"{prefix}/value_loss": np.mean(value_losses),
-            f"{prefix}/entropy_loss": np.mean(entropy_losses),
-            f"{prefix}/clip_fraction": np.mean(clip_fractions),
-            f"{prefix}/klDivergence": np.mean(target_kl),
-            f"{prefix}/avg_reward": rewards.mean().item(),
-            f"{prefix}/K-epoch": k + 1,
+            "HC/loss": np.mean(losses),
+            "HC/actor_loss": np.mean(actor_losses),
+            "HC/value_loss": np.mean(value_losses),
+            "HC/entropy_loss": np.mean(entropy_losses),
+            "HC/clip_fraction": np.mean(clip_fractions),
+            "HC/klDivergence": np.mean(target_kl),
+            "HC/avg_reward": rewards.mean().item(),
+            "HC/K-epoch": k + 1,
         }
         grad_dict = self.average_dict_values(grad_dicts)
         norm_dict = self.compute_weight_norm(
             [self.policy, self.primitivePolicy, self.critic],
             ["policy", "primitivePolicy", "critic"],
-            dir=prefix,
+            dir="HC",
             device=self.device,
         )
         loss_dict.update(grad_dict)
@@ -348,12 +348,12 @@ class HC_Controller(BasePolicy):
         del states, actions, option_actions, rewards, terminals, old_logprobs
         torch.cuda.empty_cache()
 
-        t1 = time.time()
         self.eval()
-        return (
-            loss_dict,
-            t1 - t0,
-        )
+
+        timesteps = self.minibatch_size * (k + 1)
+        update_time = time.time() - t0
+
+        return loss_dict, timesteps, update_time
 
     def average_dict_values(self, dict_list):
         if not dict_list:

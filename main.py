@@ -4,7 +4,7 @@ from algorithms import FeatureTrain, WINTER, PPO, SAC, OptionCritic
 
 from utils.call_env import call_env
 from utils.get_args import get_args
-from utils.call_feature_weights import call_feature_weights
+from utils.call_weights import call_feature_weights, call_options, get_reward_maps
 from utils.utils import setup_logger, seed_all, load_hyperparams
 
 
@@ -53,9 +53,7 @@ def train(args, seed, unique_id):
             args=args,
         )
     elif args.algo_name == "WINTER":
-        reward_feature_weights, reward_options, state_options = call_feature_weights(
-            args.sf_r_dim, args.sf_s_dim
-        )
+        reward_feature_weights = call_feature_weights(args.sf_r_dim)
         ft = FeatureTrain(
             env=env,
             logger=logger,
@@ -64,10 +62,23 @@ def train(args, seed, unique_id):
             args=args,
         )
         sf_network, prev_epoch = ft.train()
+
+        reward_options, state_options = call_options(
+            sf_r_dim=args.sf_r_dim,
+            r_option_num=args.r_option_num,
+            sf_s_dim=args.sf_s_dim,
+            s_option_num=args.s_option_num,
+            sf_network=sf_network,
+            sampler=ft.sampler,
+            buffer=ft.buffer,
+            grid_type=args.grid_type,
+            gamma=args.gamma,
+            method=args.method,
+            device=args.device,
+        )
         alg = WINTER(
             env=env,
             sf_network=sf_network,
-            prev_epoch=prev_epoch,
             logger=logger,
             writer=writer,
             reward_options=reward_options,
@@ -102,15 +113,16 @@ def override_args():
 
 
 if __name__ == "__main__":
-    args = override_args()
+    init_args = override_args()
     unique_id = str(uuid.uuid4())[:4]
 
-    seed_all(args.seed)
-    seeds = [random.randint(1, 100_000) for _ in range(args.num_runs)]
+    seed_all(init_args.seed)
+    seeds = [random.randint(1, 100_000) for _ in range(init_args.num_runs)]
     print(f"-------------------------------------------------------")
     print(f"      Running ID: {unique_id}")
     print(f"      Running Seeds: {seeds}")
     print(f"-------------------------------------------------------")
 
     for seed in seeds:
+        args = override_args()
         train(args, seed, unique_id)

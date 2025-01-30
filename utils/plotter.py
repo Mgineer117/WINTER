@@ -176,70 +176,6 @@ class Plotter:
         )
         plt.close()
 
-    def plotPath(
-        self,
-        grid: np.ndarray,
-        path: list,
-        dir: str,
-        epoch: int,
-        path_marker: list | None = None,
-    ):
-        img_size = grid.shape[0]
-
-        if not os.path.exists(dir):
-            os.mkdir(dir)
-        grid = np.rot90(grid, k=1)
-        plt.imshow(grid, origin="upper")
-        plt.axis("off")
-
-        path_length = len(path[:-1]) - 1
-        idx = 0
-        for i_point, f_point in zip(path[:-1], path[1:]):
-            y = (
-                i_point[0] * self.img_tile_size + self.img_tile_size / 2,
-                f_point[0] * self.img_tile_size + self.img_tile_size / 2,
-            )
-            x = (
-                i_point[1] * self.img_tile_size + self.img_tile_size / 2,
-                f_point[1] * self.img_tile_size + self.img_tile_size / 2,
-            )
-
-            y = [img_size - i for i in y]
-
-            if idx == 0:
-                plt.scatter(x[0], y[0], color="red", s=30)
-            if idx == path_length:
-                plt.scatter(x[1], y[1], color="blue", s=30)
-            if path_marker is not None:
-                if path_marker[idx] == True:
-                    plt.scatter(
-                        x[0],
-                        y[0],
-                        color="yellow",
-                        marker="*",
-                        s=100,
-                        edgecolors="black",
-                        linewidths=1.0,
-                    )
-
-            # list bool comparison is error
-            if not isinstance(i_point, tuple):
-                i_point = tuple(i_point)
-            if not isinstance(f_point, tuple):
-                f_point = tuple(f_point)
-
-            if i_point != f_point:
-                plt.plot(x, y, color="green", linewidth=2)
-            idx += 1
-
-        plt.tight_layout()
-        plt.savefig(
-            f"{dir}/{epoch}.png",
-            bbox_inches="tight",
-            pad_inches=0,
-        )
-        plt.close()
-
     def plotPath2(
         self,
         grid: np.ndarray,
@@ -456,44 +392,44 @@ class Plotter:
 
         # print(features[:, :, 0])
 
-        # ## COMPUTE DELTA-PHI
-        # coordinates = np.stack((coords[0], coords[1]), axis=-1)
-        # for agent_dir in agent_dirs:
-        #     """
-        #     agent_dir 0: left
-        #     agent_dir 1: up
-        #     agent_dir 2: right
-        #     agent_dir 3: down
-        #     """
-        #     for x, y in zip(coords[0], coords[1]):
-        #         if agent_dir == 0:
-        #             temp_x, temp_y = x, y - 1
-        #             if any((coordinates == (temp_x, temp_y)).all(axis=-1)):
-        #                 deltaPhi[agent_dir, x, y, :] += features[temp_x, temp_y, :]
-        #             else:
-        #                 deltaPhi[agent_dir, x, y, :] += features[x, y, :]
-        #         elif agent_dir == 1:
-        #             temp_x, temp_y = x - 1, y
-        #             if any((coordinates == (temp_x, temp_y)).all(axis=-1)):
-        #                 deltaPhi[agent_dir, x, y, :] += features[temp_x, temp_y, :]
-        #             else:
-        #                 deltaPhi[agent_dir, x, y, :] += features[x, y, :]
-        #         elif agent_dir == 2:
-        #             temp_x, temp_y = x, y + 1
-        #             if any((coordinates == (temp_x, temp_y)).all(axis=-1)):
-        #                 deltaPhi[agent_dir, x, y, :] += features[temp_x, temp_y, :]
-        #             else:
-        #                 deltaPhi[agent_dir, x, y, :] += features[x, y, :]
-        #         elif agent_dir == 3:
-        #             temp_x, temp_y = x + 1, y
-        #             if any((coordinates == (temp_x, temp_y)).all(axis=-1)):
-        #                 deltaPhi[agent_dir, x, y, :] += features[temp_x, temp_y, :]
-        #             else:
-        #                 deltaPhi[agent_dir, x, y, :] += features[x, y, :]
+        ### COMPUTE DELTA-PHI
+        coordinates = np.stack((coords[0], coords[1]), axis=-1)
+        for agent_dir in agent_dirs:
+            """
+            agent_dir 0: left
+            agent_dir 1: up
+            agent_dir 2: right
+            agent_dir 3: down
+            """
+            for x, y in zip(coords[0], coords[1]):
+                if agent_dir == 0:
+                    temp_x, temp_y = x, y - 1
+                    if any((coordinates == (temp_x, temp_y)).all(axis=-1)):
+                        deltaPhi[agent_dir, x, y, :] += features[temp_x, temp_y, :]
+                    else:
+                        deltaPhi[agent_dir, x, y, :] += features[x, y, :]
+                elif agent_dir == 1:
+                    temp_x, temp_y = x - 1, y
+                    if any((coordinates == (temp_x, temp_y)).all(axis=-1)):
+                        deltaPhi[agent_dir, x, y, :] += features[temp_x, temp_y, :]
+                    else:
+                        deltaPhi[agent_dir, x, y, :] += features[x, y, :]
+                elif agent_dir == 2:
+                    temp_x, temp_y = x, y + 1
+                    if any((coordinates == (temp_x, temp_y)).all(axis=-1)):
+                        deltaPhi[agent_dir, x, y, :] += features[temp_x, temp_y, :]
+                    else:
+                        deltaPhi[agent_dir, x, y, :] += features[x, y, :]
+                elif agent_dir == 3:
+                    temp_x, temp_y = x + 1, y
+                    if any((coordinates == (temp_x, temp_y)).all(axis=-1)):
+                        deltaPhi[agent_dir, x, y, :] += features[temp_x, temp_y, :]
+                    else:
+                        deltaPhi[agent_dir, x, y, :] += features[x, y, :]
 
-        # # sum all connected next_phi - current phi
-        # deltaPhi = torch.mean(deltaPhi, axis=0)  # [x, y, f]
-        # deltaPhi -= features
+        # sum all connected next_phi - current phi
+        deltaPhi = torch.mean(deltaPhi, axis=0)  # [x, y, f]
+        deltaPhi -= features
         deltaPhi = features
 
         if algo_name in ("SNAC", "SNAC+", "SNAC++", "SNAC+++"):

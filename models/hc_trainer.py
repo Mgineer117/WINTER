@@ -1,21 +1,16 @@
 import time
-import math
-import os
-import wandb
-import pickle
 import numpy as np
 from copy import deepcopy
 import matplotlib.cm as cm
 import torch
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
-import torch.multiprocessing as mp
+from tqdm import tqdm
 
-from typing import Optional, Dict, List
 from tqdm.auto import trange
 from collections import deque
 from log.wandb_logger import WandbLogger
-from models.policy.base_policy import BasePolicy
+from models.policy.hierarchicalController import HC_Controller
 from utils.sampler import OnlineSampler
 from utils.buffer import TrajectoryBuffer
 from models.evaulators.sf_evaluator import Evaluator
@@ -25,17 +20,14 @@ from models.evaulators.sf_evaluator import Evaluator
 class HCTrainer:
     def __init__(
         self,
-        policy: BasePolicy,
+        policy: HC_Controller,
         sampler: OnlineSampler,
         logger: WandbLogger,
         writer: SummaryWriter,
         evaluator: Evaluator,
-        prefix: str = "HC",
-        epoch: int = 1000,
-        init_epoch: int = 0,
-        step_per_epoch: int = 200,
-        eval_episodes: int = 10,
-        lr_scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
+        timesteps: int = 1000,
+        init_timesteps: int = 0,
+        lr_scheduler: torch.optim.lr_scheduler = None,
         log_interval: int = 2,
         grid_type: int = 0,
     ) -> None:
@@ -47,11 +39,10 @@ class HCTrainer:
         self.writer = writer
 
         # training parameters
-        self._prefix = prefix
-        self._epoch = epoch
-        self._step_per_epoch = step_per_epoch
-        self._init_epoch = init_epoch
-        self._eval_episodes = eval_episodes
+        self.timesteps = timesteps
+        self.init_timesteps = init_timesteps
+        self.eval_num = 0
+        self.eval_interval = int(self.timesteps / log_interval)
         self.lr_scheduler = lr_scheduler
 
         # initialize the essential training components
@@ -62,67 +53,109 @@ class HCTrainer:
         self.log_interval = log_interval
         self.grid_type = grid_type
 
-    def train(self) -> Dict[str, float]:
+    def train(self) -> dict[str, float]:
         start_time = time.time()
+
         self.last_reward_mean = deque(maxlen=3)
         self.last_reward_std = deque(maxlen=3)
 
-        # Total iterations tracking
-        total_iterations = (self._epoch - self._init_epoch) * self._step_per_epoch
-        completed_iterations = 0
-
         # Train loop
-        for e in trange(self._init_epoch, self._epoch, desc=f"HC Epoch"):
-            ### Training loop
-            self.policy.train()
-            for it in trange(self._step_per_epoch, desc=f"Training", leave=False):
+        with tqdm(total=self.timesteps, desc=f"HC Training (Timesteps)") as pbar:
+            while pbar.n < self.timesteps:
+                self.policy.train()
                 batch, sample_time = self.sampler.collect_samples(
                     self.policy, grid_type=self.grid_type, is_option=True
                 )
-                loss, update_time = self.policy.learn(batch, prefix=self._prefix)
+                loss_dict, hc_timesteps, update_time = self.policy.learn(batch)
 
                 # Calculate expected remaining time
-                completed_iterations += 1
+                pbar.update(hc_timesteps)
+
                 elapsed_time = time.time() - start_time
-                avg_time_per_iter = elapsed_time / completed_iterations
+                avg_time_per_iter = elapsed_time / pbar.n
                 remaining_time = avg_time_per_iter * (
-                    total_iterations - completed_iterations
+                     self.timesteps - pbar.n
                 )
 
                 # Update environment steps and calculate time metrics
-                self.num_env_steps += len(batch["rewards"])
-                loss[self._prefix + "/sample_time"] = sample_time
-                loss[self._prefix + "/update_time"] = update_time
-                loss[self._prefix + "/remaining_time (hr)"] = (
+                loss_dict["HC/timesteps"] = pbar.n
+                loss_dict["HC/sample_time"] = sample_time
+                loss_dict["HC/update_time"] = update_time
+                loss_dict["HC/remaining_time (hr)"] = (
                     remaining_time / 3600
                 )  # Convert to hours
 
-                self.write_log(loss, iter_idx=int(e * self._step_per_epoch + it))
-                torch.cuda.empty_cache()
+                self.write_log(loss_dict, step=int(pbar.n + self.init_timesteps))
 
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
 
             ### Eval Loop
-            self.policy.eval()
-            eval_dict = self.evaluator(
-                self.policy,
-                env_step=self.num_env_steps,
-                epoch=e + 1,
-                iter_idx=int(e * self._step_per_epoch + self._step_per_epoch),
-                dir_name=self._prefix,
-                grid_type=self.grid_type,
-            )
+            if pbar.n >= self.eval_interval * (self.eval_num + 1):
+                self.policy.eval()
+                self.eval_num += 1
 
-            self.last_reward_mean.append(eval_dict["rew_mean"])
-            self.last_reward_std.append(eval_dict["rew_std"])
+                temp_eval_dict, supp_dict = self.evaluator(
+                    self.policy,
+                    grid_type=self.grid_type,
+                )
 
-            self.save_model(e + 1)
-            torch.cuda.empty_cache()
+                eval_dict = {}
+                for k in temp_eval_dict.keys():
+                    eval_dict["HC/" + k] = temp_eval_dict[k]
+
+                self.write_log(
+                    eval_dict,
+                    step=int(pbar.n + self.init_timesteps),
+                )
+                self.write_image(
+                    supp_dict,
+                    step=int(pbar.n + self.init_timesteps),
+                    log_dir="HC_image/",
+                )
+                self.write_video(
+                    supp_dict,
+                    step=int(pbar.n + self.init_timesteps),
+                    log_dir="HC_video/",
+                )
+
+                self.last_reward_mean.append(eval_dict["HC/rew_mean"])
+                self.last_reward_std.append(eval_dict["HC/rew_std"])
+
+                self.save_model(int(pbar.n + self.init_timesteps))
+                torch.cuda.empty_cache()
 
         self.logger.print(
-            f"total {self._prefix} training time: {((time.time() - start_time) / 3600):.2f} hours"
+            f"total HC training time: {((time.time() - start_time) / 3600):.2f} hours"
         )
+
+    def write_log(self, logging_dict: dict, step: int):
+        # Logging to WandB and Tensorboard
+        self.logger.store(**logging_dict)
+        self.logger.write(step, display=False)
+        for key, value in logging_dict.items():
+            self.writer.add_scalar(key, value, step)
+
+    def write_image(self, supp_dict: dict, step: int, log_dir: str):
+        if supp_dict["path_image"] is not None:
+            image_list = [supp_dict["path_image"]]
+            path_image_path = log_dir + f"path_image"
+            self.logger.write_images(
+                step=step, images=image_list, log_dir=path_image_path
+            )
+        if supp_dict["option_image"] is not None:
+            image_list = [supp_dict["option_image"]]
+            path_image_path = log_dir + f"option_image"
+            self.logger.write_images(
+                step=step, images=image_list, log_dir=path_image_path
+            )
+
+    def write_video(self, supp_dict: dict, step: int, log_dir: str):
+        if supp_dict["path_render"] is not None:
+            path_render_path = log_dir + f"path_render"
+            self.logger.write_videos(
+                step=step, images=supp_dict["path_render"], log_dir=path_render_path
+            )
 
     def save_model(self, e):
         # save checkpoint
@@ -135,7 +168,7 @@ class HCTrainer:
             and np.mean(self.last_reward_std) <= self.std_limit
         ):
             self.policy.save_model(
-                self.logger.log_dirs[2], e, name=self._prefix, is_best=True
+                self.logger.log_dirs[2], e, name="HC", is_best=True
             )
             self.last_max_reward = np.mean(self.last_reward_mean)
 
@@ -155,10 +188,3 @@ class HCTrainer:
         avg_dict = {key: sum_val / len(dict_list) for key, sum_val in sum_dict.items()}
 
         return avg_dict
-
-    def write_log(self, logging_dict: dict, iter_idx: int):
-        # Logging to WandB and Tensorboard
-        self.logger.store(**logging_dict)
-        self.logger.write(int(iter_idx), display=False)
-        for key, value in logging_dict.items():
-            self.writer.add_scalar(key, value, int(iter_idx))

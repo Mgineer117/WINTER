@@ -1,4 +1,5 @@
 import uuid
+import numpy as np
 from typing import Iterable
 
 import wandb
@@ -74,6 +75,32 @@ class WandbLogger(BaseLogger):
     def write_without_reset(self, step: int) -> None:
         """Sending data to wandb without resetting the current stored stats."""
         wandb.log(self.stats_mean, step=step)
+
+    def write_images(self, step: int, images: list, log_dir: str) -> None:
+        """Logs images to wandb."""
+        image_list = []
+        for img in images:
+            # img can be a path to an image file or a numpy array representing an image.
+            # You can also use wandb.Image to wrap the image data in case it's an array.
+            if isinstance(img, str):
+                # If the img is a file path, log it directly
+                image_list.append(wandb.Image(img))
+            else:
+                # If the img is an array (e.g., numpy array), log it as a wandb image
+                image_list.append(wandb.Image(img))
+
+        # Log the list of images
+        wandb.log({f"{log_dir}": image_list}, step=step)
+
+    def write_videos(self, step: int, images: np.ndarray, log_dir: str) -> None:
+        """
+        Logs a video to wandb using a list of images.
+        """
+        # Convert images to the required shape: (time, channel, height, width)
+        images = np.transpose(images, (0, 3, 1, 2))  # Convert to (time, 3, H, W)
+
+        # Log the video to wandb
+        wandb.log({f"{log_dir}": wandb.Video(images, fps=10)}, step=step)
 
     def restore_data(self) -> None:
         """Not implemented yet"""

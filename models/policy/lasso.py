@@ -8,12 +8,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
-import matplotlib
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 from models.layers import MLP, ConvNetwork
 from models.policy.base_policy import BasePolicy
-
-matplotlib.use("Agg")
 
 
 def compare_network_weights(model1: nn.Module, model2: nn.Module) -> float:
@@ -97,9 +95,12 @@ def normalize_tensor(tensor):
 class LASSO(BasePolicy):
     def __init__(
         self,
+        env_name: str,
         feaNet: ConvNetwork,
         feature_weights: np.ndarray,
         a_dim: int,
+        sf_r_dim: int,
+        sf_s_dim: int,
         sf_lr: float = 1e-4,
         batch_size: int = 1024,
         reward_loss_scaler: float = 1.0,
@@ -113,6 +114,10 @@ class LASSO(BasePolicy):
         super(LASSO, self).__init__()
 
         ### constants
+        self.sf_r_dim = sf_r_dim
+        self.sf_s_dim = sf_s_dim
+
+        self.env_name = env_name
         self.device = device
         self.batch_size = batch_size
 
@@ -188,28 +193,17 @@ class LASSO(BasePolicy):
     def random_walk(self, obs):
         return self(obs)
 
-    def get_features(self, obs, to_numpy: bool = False):
-        obs = self.preprocess_obs(obs)
-        with torch.no_grad():
-            phi, _ = self.feaNet(obs["observation"], deterministic=True)
+    def get_features(
+        self,
+        states: torch.Tensor,
+        deterministic: bool = False,
+        to_numpy: bool = False,
+    ):
+        phi, _ = self.feaNet(states, deterministic=deterministic)
         if to_numpy:
             phi = phi.cpu().numpy()
+
         return phi
-
-    def get_cumulative_features(self, obs, to_numpy: bool = False):
-        """
-        The naming intuition is that phi and psi are not really distinguishable
-        """
-        obs = self.preprocess_obs(obs)
-        with torch.no_grad():
-            phi, _ = self.feaNet(
-                obs["observation"], obs["agent_pos"], deterministic=True
-            )
-            psi, _ = self.psiNet(phi)
-
-        if to_numpy:
-            psi = psi.cpu().numpy()
-        return psi, {}
 
     def phi_Loss(self, states, actions, next_states, rewards):
         """
@@ -219,16 +213,18 @@ class LASSO(BasePolicy):
         phi ~ [N, F/2]
         w ~ [1, F/2]
         """
-        phi, conv_dict = self.feaNet(states, deterministic=False)
-        phi_r, phi_s = self.split(phi, self.feature_weights.shape[0])
+        phi = self.get_features(states)
+        phi_r, phi_s = self.split(phi, self.sf_r_dim)
+
+        #### auto lasso penalty calculation according to the dimension
+        r_dim = torch.tensor(phi_r.shape[-1], device=self.device)
+        s_dim = torch.tensor(phi_s.shape[-1], device=self.device)
 
         reward_pred = self.multiply_weights(phi_r, self.feature_weights)
         reward_loss = self._reward_loss_scaler * self.mse_loss(reward_pred, rewards)
 
-        state_pred = self.decode(phi_s, actions, conv_dict)
-        state_loss = self._state_loss_scaler * (
-            1 / self.mse_loss(state_pred, next_states)
-        )
+        state_pred = self.decode(phi, actions)
+        state_loss = self._state_loss_scaler * self.mse_loss(state_pred, next_states)
 
         weight_norm = 0
         for param in self.feaNet.parameters():
@@ -240,9 +236,9 @@ class LASSO(BasePolicy):
         phi_r_norm = torch.norm(phi_r, p=1)
         phi_s_norm = torch.norm(phi_s, p=1)
 
-        lasso_loss = self._lasso_loss_scaler * (phi_r_norm + phi_s_norm)
+        lasso_loss = self._lasso_loss_scaler * phi_r_norm
 
-        lasso_penalty = torch.relu(1e-3 - phi_r_norm)
+        lasso_penalty = torch.relu(1e-3 * torch.sqrt(r_dim) - phi_r_norm)
 
         phi_loss = reward_loss + state_loss + weight_loss + lasso_loss + lasso_penalty
 
@@ -259,20 +255,141 @@ class LASSO(BasePolicy):
             "phi_s_norm": phi_s_norm,
         }
 
-    def decode(self, phi, actions, conv_dict):
+    def decode(self, phi, actions):
         # Does some dimensional and np <-> tensor work
         # and pass it to feature decoder actions should be one-hot
         if isinstance(phi, np.ndarray):
             phi = torch.from_numpy(phi).to(self.device).to(self._dtype)
-            if len(phi.shape) == 1:
-                phi = phi.unsqueeze(0)
+        if len(phi.shape) == 1:
+            phi = phi.unsqueeze(0)
         if isinstance(actions, np.ndarray):
             actions = torch.from_numpy(actions).to(self.device).to(self._dtype)
-            if len(actions.shape) == 1:
-                actions = actions.unsqueeze(0)
+        if len(actions.shape) == 1:
+            actions = actions.unsqueeze(0)
 
-        reconstructed_state = self.feaNet.decode(phi, actions, conv_dict)
+        reconstructed_state = self.feaNet.decode(phi, actions)
         return reconstructed_state
+
+    def evaluate(self, buffer):
+        ### Pull data from the batch
+        batch = buffer.sample(self.batch_size)
+        log_num = 10
+
+        states = (
+            torch.from_numpy(batch["states"]).to(self._dtype).to(self.device)[:log_num]
+        )
+        actions = (
+            torch.from_numpy(batch["actions"]).to(self._dtype).to(self.device)[:log_num]
+        )
+        next_states = batch["next_states"][:log_num]
+        rewards = batch["rewards"][:log_num]
+
+        with torch.no_grad():
+            phi = self.get_features(states, deterministic=True)
+            reward_feature, state_feature = self.split(phi, self.sf_r_dim)
+            reward_preds = self.multiply_weights(reward_feature, self.feature_weights)
+
+        ### decoder reconstructed images ###
+        ground_truth_images = []
+        predicted_images = []
+        for i in range(phi.shape[0]):
+            # Decode the feature and append to reconstructed states
+            with torch.no_grad():
+                true_state = next_states[i]
+                decoded_state = self.decode(phi[i], actions[i])
+                decoded_state = decoded_state.squeeze(0)
+
+            # Handle vector data by reshaping into a heatmap
+
+            if decoded_state.dim() == 1:  # If the state is a vector
+                heatmap_data = (
+                    decoded_state.cpu().numpy().reshape(1, -1)
+                )  # Reshape for heatmap
+            else:  # Assume it's already 2D
+                heatmap_data = decoded_state.cpu().numpy()
+
+            # Normalize the heatmap data between 0 and 1
+            true_image = (true_state - np.min(true_state)) / (
+                np.max(true_state) - np.min(true_state)
+            )
+            pred_image = (heatmap_data - np.min(heatmap_data)) / (
+                np.max(heatmap_data) - np.min(heatmap_data)
+            )
+
+            # Update the corresponding subplot
+            ground_truth_images.append(true_image)
+            predicted_images.append(pred_image)
+
+        ### create reward plot ###
+        x = range(log_num)
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.stem(
+            x,
+            rewards,
+            linefmt="r-",
+            markerfmt="ro",
+            basefmt="k-",
+            label="True Rewards",
+        )
+        ax.stem(
+            x,
+            reward_preds.cpu().numpy(),
+            linefmt="b-",
+            markerfmt="bo",
+            basefmt="k-",
+            label="Predicted Rewards",
+        )
+
+        # Set logarithmic y-scale
+        # ax.set_yscale('log')
+        ax.set_xlabel("Reward Index")
+        ax.set_ylabel("Reward")
+        ax.set_title("Predicted vs True Rewards")
+        ax.legend()
+        ax.grid(True, which="both", ls="--", linewidth=0.5)
+        plt.tight_layout()
+
+        # Render the figure to a canvas
+        canvas = FigureCanvas(fig)
+        canvas.draw()
+
+        # Convert canvas to a NumPy array
+        reward_pred_img = np.frombuffer(canvas.tostring_rgb(), dtype="uint8")
+        reward_pred_img = reward_pred_img.reshape(
+            canvas.get_width_height()[::-1] + (3,)
+        )  # Shape: (height, width, 3)
+        plt.close()
+
+        ### FEATURE IMAGE ###
+        phi = phi.cpu().numpy()
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.imshow(
+            phi,
+            cmap='viridis',
+            interpolation="nearest",
+        )
+        ax.set_title("Feature heatmap")
+        plt.tight_layout()
+
+        # Render the figure to a canvas
+        canvas = FigureCanvas(fig)
+        canvas.draw()
+
+        # Convert canvas to a NumPy array
+        feature_img = np.frombuffer(canvas.tostring_rgb(), dtype="uint8")
+        feature_img = feature_img.reshape(
+            canvas.get_width_height()[::-1] + (3,)
+        )  # Shape: (height, width, 3)
+        plt.close()
+        
+
+        return {
+            "ground_truth": ground_truth_images,
+            "prediction": predicted_images,
+            "reward_plot": [reward_pred_img],
+            "feature_plot":[feature_img]
+        }
 
     def learn(self, buffer):
         self.train()

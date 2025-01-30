@@ -99,7 +99,6 @@ class FeatureTrain:
             training_env=self.env,
             plotter=self.plotter,
             dir=self.sf_path,
-            log_interval=args.sf_log_interval,
         )
 
     def train(self):
@@ -143,9 +142,5 @@ class FeatureTrain:
             final_epoch = self.curr_epoch + self.args.SF_epoch
 
         self.curr_epoch += final_epoch
-
-        # clear the memory
-        self.buffer.wipe()
-        torch.cuda.empty_cache()
 
         return sf_network, self.curr_epoch

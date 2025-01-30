@@ -191,7 +191,6 @@ class PPO_Learner(BasePolicy):
             kl_div = torch.mean(mb_old_logprobs - logprobs)
             target_kl.append(kl_div.item())
             if kl_div.item() > self._target_kl:
-                print(f"Early stopping due to target KL divergence: {kl_div.item()}")
                 break
 
             # Update critic parameters
@@ -231,10 +230,12 @@ class PPO_Learner(BasePolicy):
         # Cleanup
         del states, actions, rewards, terminals, old_logprobs
         torch.cuda.empty_cache()
-
-        t1 = time.time()
+        
         self.eval()
-        return loss_dict, t1 - t0
+        
+        timesteps = self.minibatch_size * (k + 1)
+        update_time = time.time() - t0
+        return loss_dict, timesteps, update_time
 
     def average_dict_values(self, dict_list):
         if not dict_list:

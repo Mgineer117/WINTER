@@ -70,7 +70,7 @@ class SFTrainer:
         current_iteration = 0
 
         # Warm buffer
-        sample_time = self.warm_buffer()
+        sample_time = self.warm_buffer(post_process=self.post_process, minimum=True)
 
         init_epoch = self._init_epoch
         final_epoch = self._epoch
@@ -96,9 +96,8 @@ class SFTrainer:
                     remaining_time / 3600
                 )  # Log remaining time
 
-                self.write_log(loss, iter_idx=int(e * self._step_per_epoch + it))
+                self.write_log(loss, step=int(e * self._step_per_epoch + it))
                 sample_time = 0
-                torch.cuda.empty_cache()
 
             if self.scheduler is not None:
                 self.scheduler.step()
@@ -110,19 +109,25 @@ class SFTrainer:
                 self.buffer.push(batch)
 
             ### Eval
-            self.policy.eval()
-            self.evaluator(
-                self.policy,
-                epoch=e,
-                iter_idx=int(e * self._step_per_epoch + self._step_per_epoch),
-                dir_name="SF",
-                grid_type=self.grid_type,
-            )
-            self.save_model(e + 1)
-            torch.cuda.empty_cache()
+            if e % self.log_interval == 0:
+                self.policy.eval()
+                eval_dict = self.policy.evaluate(self.buffer)
+                self.write_image(
+                    eval_dict=eval_dict,
+                    step=int(e * self._step_per_epoch + it),
+                    log_dir="SF/",
+                )
+
+                # self.evaluator(
+                #     self.policy,
+                #     epoch=e,
+                #     iter_idx=int(e * self._step_per_epoch + self._step_per_epoch),
+                #     dir_name="SF",
+                #     grid_type=self.grid_type,
+                # )
+                self.save_model(e + 1)
 
         self.buffer.wipe()
-        self.post_process = None
         torch.cuda.empty_cache()
 
         self.policy.eval()
@@ -139,8 +144,14 @@ class SFTrainer:
         if e % self.log_interval == 0:
             self.policy.save_model(self.logger.checkpoint_dirs[0], e)
 
-    def warm_buffer(self):
+    def warm_buffer(self, post_process: str | None, minimum: bool):
         t0 = time.time()
+
+        if minimum:
+            threshold = self.buffer.min_batch_size
+        else:
+            threshold = self.buffer.max_batch_size
+
         # make sure there is nothing there
         self.buffer.wipe()
 
@@ -148,22 +159,22 @@ class SFTrainer:
         count = 0
         total_sample_time = 0
         sample_time = 0
-        while self.buffer.num_samples < self.buffer.min_batch_size:
+        while self.buffer.num_samples < threshold:
             batch, sampleT = self.sampler.collect_samples(
                 self.policy, grid_type=self.grid_type, random_init_pos=True
             )
-            self.buffer.push(batch, post_process=self.post_process)
+            self.buffer.push(batch, post_process=post_process)
             sample_time += sampleT
             total_sample_time += sampleT
             if count % 25 == 0:
                 print(
-                    f"\nWarming buffer with {self.post_process} {self.buffer.num_samples}/{self.buffer.min_batch_size} | sample_time = {sample_time:.2f}s",
+                    f"\nWarming buffer with {post_process} {self.buffer.num_samples}/{threshold} | sample_time = {sample_time:.2f}s",
                     end="",
                 )
                 sample_time = 0
             count += 1
         print(
-            f"\nWarming Complete! {self.buffer.num_samples}/{self.buffer.min_batch_size} | total sample_time = {total_sample_time:.2f}s",
+            f"\nWarming Complete! {self.buffer.num_samples}/{threshold} | total sample_time = {total_sample_time:.2f}s",
             end="",
         )
         print()
@@ -171,9 +182,43 @@ class SFTrainer:
         sample_time = t1 - t0
         return sample_time
 
-    def write_log(self, logging_dict: dict, iter_idx: int):
+    def write_log(self, logging_dict: dict, step: int):
         # Logging to WandB and Tensorboard
         self.logger.store(**logging_dict)
-        self.logger.write(int(iter_idx), display=False)
+        self.logger.write(step, display=False)
         for key, value in logging_dict.items():
-            self.writer.add_scalar(key, value, int(iter_idx))
+            self.writer.add_scalar(key, value, step)
+
+    def write_image(self, eval_dict: dict, step: int, log_dir: str):
+        if eval_dict["ground_truth"] is not None:
+            true_path = log_dir + "true"
+            self.logger.write_images(
+            step=step, images=eval_dict["ground_truth"], log_dir=true_path
+        )
+        if eval_dict["prediction"] is not None:
+            pred_path = log_dir + "pred"
+            self.logger.write_images(
+            step=step, images=eval_dict["prediction"], log_dir=pred_path
+        )
+        if eval_dict["reward_plot"] is not None:
+            reward_path = log_dir + "reward_plot"
+            self.logger.write_images(
+            step=step,
+            images=eval_dict["reward_plot"],
+            log_dir=reward_path,
+        )
+        if eval_dict["feature_plot"] is not None:
+            feature_path = log_dir + "feature_plot"
+            self.logger.write_images(
+            step=step,
+            images=eval_dict["feature_plot"],
+            log_dir=feature_path,
+        )
+
+
+        
+        
+
+        
+        
+        
