@@ -286,7 +286,6 @@ def plotRewardMap(
             )
 
         for x, y in zip(x_coords, y_coords):
-            print(rewards.shape, reward.shape)
             rewards[vec_idx, x, y] += reward[x, y]
 
     ### Normalization
