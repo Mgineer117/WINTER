@@ -1,4 +1,5 @@
 import numpy as np
+from math import ceil
 import torch
 import torch.nn as nn
 import gymnasium as gym
@@ -47,8 +48,13 @@ def call_feature_weights(sf_r_dim: int):
         reward_feature_weights = np.array([1.0, 0.0, -1.0])
     elif sf_r_dim == 5:
         reward_feature_weights = np.array([1.0, 0.5, 0.0, -0.5, -1.0])
+        # reward_feature_weights = np.array([1.0, 1.0, 0.0, -1.0, -1.0])
     elif sf_r_dim == 7:
         reward_feature_weights = np.array([1.0, 0.66, 0.33, 0.0, -0.33, -0.66, -1.0])
+    elif sf_r_dim == 10:
+        reward_feature_weights = np.array(
+            [1.0, 0.25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, -1.0]
+        )
     else:
         raise ValueError(f"sf_r_dim (given: {sf_r_dim}) is not one of [3, 5, 7] ")
 
@@ -70,6 +76,16 @@ def call_options(
 ):
     ### create a option vector
     reward_options = create_matrix(sf_r_dim)[: 2 * r_option_num]
+    # reward_options = np.array(
+    #     [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    #     [-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    #     [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    #     [0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    #     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+    #     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0],
+    #     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+    #     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0],
+    # )
 
     if sf_s_dim != 0:
         # Warm buffer
@@ -110,14 +126,15 @@ def call_options(
             V = crs_V
 
         elif method == "trs":
-            n = int(0.25 * s_option_num)  # Calculate 25% of s_option_num
+            n = ceil(0.25 * s_option_num)  # Calculate 25% of s_option_num
             top_n_V = V[:n]
             remainder_V = V[n:]
+            pseudo_rewards = remainder_V @ features.T
 
             kmeans = KMeans(
                 n_clusters=s_option_num - n, init="k-means++", random_state=42
             )
-            kmeans.fit(remainder_V @ features.T)
+            kmeans.fit(pseudo_rewards)
             cluster_labels = kmeans.labels_
 
             crs_V = np.empty((s_option_num - n, remainder_V.shape[-1]))
@@ -138,24 +155,26 @@ def get_reward_maps(
     env: gym.Env, sf_network: nn.Module, V: list, feature_dim: int, grid_type: int
 ):
 
-    grid_tensor, x_coords, y_coords = get_grid_and_coords(env, grid_type)
+    raw_grid, x_coords, y_coords = get_grid_and_coords(env, grid_type)
     random_indices = random.sample(range(len(x_coords)), 2)
-    grid = grid_tensor.copy()
     # fix enemy assignment
-    grid[x_coords[random_indices[0]], y_coords[random_indices[0]], 1:] = 2
-    grid[x_coords[random_indices[1]], y_coords[random_indices[1]], 1:] = 2
+    # raw_grid[x_coords[random_indices[0]], y_coords[random_indices[0]], 1:] = 2
+    # raw_grid[x_coords[random_indices[1]], y_coords[random_indices[1]], 1:] = 2
+
+    raw_grid[3, 3, 1:] = 2
+    raw_grid[8, 8, 1:] = 2
 
     # find idx where not wall and red agent
     pos = np.where(
-        (grid[:, :, 0] != 0)
-        & (grid[:, :, 1] != 2)
-        & (grid[:, :, 1] != 3)
-        & (grid[:, :, 1] != 4)
+        (raw_grid[:, :, 0] != 0)
+        & (raw_grid[:, :, 1] != 2)
+        & (raw_grid[:, :, 1] != 3)
+        & (raw_grid[:, :, 1] != 4)
     )
 
     img = plotRewardMap(
         sf_network=sf_network,
-        grid_tensor=grid_tensor,
+        raw_grid=raw_grid,
         V=V,
         feature_dim=feature_dim,
         coords=pos,
@@ -165,30 +184,28 @@ def get_reward_maps(
 
 def get_grid_and_coords(env, grid_type):
     obs, _ = env.reset(seed=grid_type)
-    grid_tensor = obs["observation"]
+    raw_grid = obs["observation"]
     env.close()
 
-    agent_pos = np.where(grid_tensor[:, :, 1] == 1)
-    enemy_pos = np.where(grid_tensor[:, :, 1] == 2)
+    agent_pos = np.where(raw_grid[:, :, 1] == 1)
+    enemy_pos = np.where(raw_grid[:, :, 1] == 2)
 
-    grid_tensor[agent_pos[0], agent_pos[1], 1] = 0
-    grid_tensor[agent_pos[0], agent_pos[1], 2] = 0
+    raw_grid[agent_pos[0], agent_pos[1], 1] = 0
+    raw_grid[agent_pos[0], agent_pos[1], 2] = 0
 
-    grid_tensor[enemy_pos[0], enemy_pos[1], 1] = 0
-    grid_tensor[enemy_pos[0], enemy_pos[1], 2] = 0
+    raw_grid[enemy_pos[0], enemy_pos[1], 1] = 0
+    raw_grid[enemy_pos[0], enemy_pos[1], 2] = 0
 
     x_coords, y_coords = np.where(
-        (grid_tensor[:, :, 0] != 0)
-        & (grid_tensor[:, :, 1] != 3)
-        & (grid_tensor[:, :, 1] != 4)
+        (raw_grid[:, :, 0] != 0) & (raw_grid[:, :, 1] != 3) & (raw_grid[:, :, 1] != 4)
     )  # find idx where not wall
 
-    return grid_tensor, x_coords, y_coords
+    return raw_grid, x_coords, y_coords
 
 
 def plotRewardMap(
     sf_network: nn.Module,
-    grid_tensor: np.ndarray,
+    raw_grid: np.ndarray,
     V: list,
     feature_dim: int,
     coords: tuple,
@@ -199,7 +216,7 @@ def plotRewardMap(
             V[i] = torch.from_numpy(vector).to(torch.float32)
 
     ### Load parameters
-    x_grid_dim, y_grid_dim, _ = grid_tensor.shape
+    x_grid_dim, y_grid_dim, _ = raw_grid.shape
     num_reward_options = V[0].shape[0] if V[0] is not None else 0
     num_state_options = V[1].shape[0] if V[1] is not None else 0
     agent_dirs = [0, 1, 2, 3]
@@ -218,7 +235,7 @@ def plotRewardMap(
 
     for x, y in zip(x_coords, y_coords):
         # # Load the image as a NumPy array
-        img = grid_tensor.copy()
+        img = raw_grid.copy()
         img[x, y, :] = 10  # 10 is an agent
 
         with torch.no_grad():
@@ -324,10 +341,10 @@ def plotRewardMap(
 
     images = []
     walls = np.where(
-        (grid_tensor[:, :, 0] == 0)
-        | (grid_tensor[:, :, 1] == 2)
-        | (grid_tensor[:, :, 1] == 3)
-        | (grid_tensor[:, :, 1] == 4)
+        (raw_grid[:, :, 0] == 0)
+        | (raw_grid[:, :, 1] == 2)
+        | (raw_grid[:, :, 1] == 3)
+        | (raw_grid[:, :, 1] == 4)
     )
     for i in range(num_vec):
         grid = np.zeros((x_grid_dim, y_grid_dim))
@@ -338,8 +355,9 @@ def plotRewardMap(
                 grid[x, y] += 1.0
         grid[walls] = 0.0
 
-        fig, ax = plt.subplots()
-        ax.imshow(grid, cmap=cmap, interpolation="nearest", vmin=-1, vmax=1)
+        fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(12, 8))
+        ax0.imshow(raw_grid * 50)
+        ax1.imshow(grid, cmap=cmap, interpolation="nearest", vmin=-1, vmax=1)
         plt.tight_layout()
 
         # Render the figure to a canvas

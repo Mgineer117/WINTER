@@ -232,16 +232,15 @@ class HC_Controller(BasePolicy):
         # K - Loop
         for k in range(self._K):
             indices = torch.randperm(batch_size)[: self.minibatch_size]
-
             mb_states = states[indices]
             mb_option_actions = option_actions[indices]
-
-            mb_old_logprobs = old_logprobs[indices]
+            mb_old_logprobs, mb_returns = old_logprobs[indices], returns[indices]
 
             # global batch normalization and target return
-            mb_returns = returns[indices]
             mb_advantages = advantages[indices]
+            mb_advantages = (mb_advantages - mb_advantages.mean()) / mb_advantages.std()
 
+            # 1. Critic Update (with optional regularization)
             mb_values, _ = self.critic(mb_states)
             valueLoss = self.mse_loss(mb_returns, mb_values)
             value_losses.append(valueLoss.item())

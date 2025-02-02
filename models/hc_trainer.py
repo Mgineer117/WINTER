@@ -87,43 +87,43 @@ class HCTrainer:
 
                 self.write_log(loss_dict, step=int(pbar.n + self.init_timesteps))
 
-            if self.lr_scheduler is not None:
-                self.lr_scheduler.step()
+                if self.lr_scheduler is not None:
+                    self.lr_scheduler.step()
 
-            ### Eval Loop
-            if pbar.n >= self.eval_interval * (self.eval_num + 1):
-                self.policy.eval()
-                self.eval_num += 1
+                ### Eval Loop
+                if pbar.n >= self.eval_interval * (self.eval_num + 1):
+                    
+                    self.policy.eval()
+                    self.eval_num += 1
 
-                temp_eval_dict, supp_dict = self.evaluator(
-                    self.policy,
-                    grid_type=self.grid_type,
-                )
+                    temp_eval_dict, supp_dict = self.evaluator(
+                        self.policy,
+                        grid_type=self.grid_type,
+                    )
 
-                eval_dict = {}
-                for k in temp_eval_dict.keys():
-                    eval_dict["HC/" + k] = temp_eval_dict[k]
+                    eval_dict = {}
+                    for k in temp_eval_dict.keys():
+                        eval_dict["HC/" + k] = temp_eval_dict[k]
 
-                self.write_log(
-                    eval_dict,
-                    step=int(pbar.n + self.init_timesteps),
-                )
-                self.write_image(
-                    supp_dict,
-                    step=int(pbar.n + self.init_timesteps),
-                    log_dir="HC_image/",
-                )
-                self.write_video(
-                    supp_dict,
-                    step=int(pbar.n + self.init_timesteps),
-                    log_dir="HC_video/",
-                )
+                    self.write_log(
+                        eval_dict,
+                        step=int(pbar.n + self.init_timesteps),
+                    )
+                    self.write_image(
+                        supp_dict,
+                        step=int(pbar.n + self.init_timesteps),
+                        log_dir="HC_image/",
+                    )
+                    self.write_video(
+                        supp_dict,
+                        step=int(pbar.n + self.init_timesteps),
+                        log_dir="HC_video/",
+                    )
 
-                self.last_reward_mean.append(eval_dict["HC/rew_mean"])
-                self.last_reward_std.append(eval_dict["HC/rew_std"])
+                    self.last_reward_mean.append(eval_dict["HC/rew_mean"])
+                    self.last_reward_std.append(eval_dict["HC/rew_std"])
 
-                self.save_model(int(pbar.n + self.init_timesteps))
-                torch.cuda.empty_cache()
+                    self.save_model(int(pbar.n + self.init_timesteps))
 
         self.logger.print(
             f"total HC training time: {((time.time() - start_time) / 3600):.2f} hours"

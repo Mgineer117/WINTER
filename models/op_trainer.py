@@ -95,20 +95,22 @@ class OPTrainer:
         firstinit_timesteps = self.init_timesteps
         first_finaltimesteps = self.timesteps
 
-        total_iterations = (first_finaltimesteps - firstinit_timesteps) * self._step_pertimesteps
+        total_iterations = (
+            first_finaltimesteps - firstinit_timesteps
+        ) * self._step_pertimesteps
         completed_iterations = 0
 
         sample_time = self.warm_buffer()
-        for e in trange(firstinit_timesteps, first_finaltimesteps, desc=f"OP SAC timesteps"):
+        for e in trange(
+            firstinit_timesteps, first_finaltimesteps, desc=f"OP SAC timesteps"
+        ):
             ### Training loop
             self.policy.train()
             for it in trange(self._step_pertimesteps, desc="Training", leave=False):
                 sample_time = 0
                 update_time = 0
                 policy_loss = []
-                for z in trange(
-                    self.num_weights, desc=f"Updating Option", leave=False
-                ):
+                for z in trange(self.num_weights, desc=f"Updating Option", leave=False):
                     batch = self.buffers[z].sample(self.batch_size)
                     loss_dict, updateT = self.policy.learn(batch, z)
 
@@ -153,7 +155,9 @@ class OPTrainer:
                     eval_dict = self.evaluator(
                         self.policy,
                         timesteps=e + 1,
-                        iter_idx=int(e * self._step_pertimesteps + self._step_pertimesteps),
+                        iter_idx=int(
+                            e * self._step_pertimesteps + self._step_pertimesteps
+                        ),
                         idx=z,
                         name1=z,
                         dir_name="OP_SAC",
@@ -191,43 +195,38 @@ class OPTrainer:
 
     def ppo_train(self) -> dict[str, float]:
         start_time = time.time()
-        
+
         self.last_reward_mean = deque(maxlen=3)
         self.last_reward_std = deque(maxlen=3)
 
         # Train loop
         with tqdm(total=self.timesteps, desc=f"OP Training (Timesteps)") as pbar:
             while pbar.n < self.timesteps:
-                self.policy.train()     
-                
-                sample_time = 0
-                update_time = 0
-                op_mean_timesteps = 0
-                policy_loss = []
-                for z in trange(self.num_weights, desc=f"Updating Option", leave=False):
-                    # Sample batch
-                    batch, sampleT = self.sampler.collect_samples(
-                        self.policy,
-                        idx=z,
-                        grid_type=self.grid_type,
-                        random_init_pos=True,
-                    )
-                    sample_time += sampleT
+                self.policy.train()
 
+                update_time = 0
+                policy_loss = []
+
+                # Sample batch
+                batches, sample_time = self.sampler.collect_samples(
+                    self.policy,
+                    option_indices=[i for i in range(self.num_weights)],
+                    grid_type=self.grid_type,
+                    random_init_pos=True,
+                )
+
+                for z in trange(self.num_weights, desc=f"Updating Option", leave=False):
                     # Update params
-                    loss_dict, op_timesteps, updateT = self.policy.learn(batch, z)
+                    loss_dict, op_timesteps, updateT = self.policy.learn(batches[z], z)
                     policy_loss.append(loss_dict)
-                    op_mean_timesteps += op_timesteps
                     update_time += updateT
 
-                # Calculate expected remaining time
-                pbar.update(int(op_mean_timesteps / self.num_weights))
+                    # Calculate expected remaining time
+                    pbar.update(int(op_timesteps / self.num_weights))
 
                 elapsed_time = time.time() - start_time
                 avg_time_per_iter = elapsed_time / pbar.n
-                remaining_time = avg_time_per_iter * (
-                     self.timesteps - pbar.n
-                )
+                remaining_time = avg_time_per_iter * (self.timesteps - pbar.n)
 
                 # Logging further info
                 loss = self.average_dict_values(policy_loss)
@@ -281,8 +280,7 @@ class OPTrainer:
                     self.last_reward_mean.append(eval_dict["OP_PPO/rew_mean"])
                     self.last_reward_std.append(eval_dict["OP_PPO/rew_std"])
 
-                    self.savemodel(int(pbar.n + self.init_timesteps))
-                torch.cuda.empty_cache()
+                    self.save_model(int(pbar.n + self.init_timesteps))
 
         self.policy.eval()
         self.logger.print(
@@ -298,7 +296,9 @@ class OPTrainer:
         firstinit_timesteps = self.init_timesteps
         first_finaltimesteps = self.init_timesteps + timesteps
         ### Eval Loop
-        for e in trange(firstinit_timesteps, first_finaltimesteps, desc=f"OP Eval timesteps"):
+        for e in trange(
+            firstinit_timesteps, first_finaltimesteps, desc=f"OP Eval timesteps"
+        ):
             self.policy.eval()
             rew_mean = np.zeros((self.num_weights,))
             rew_std = np.zeros((self.num_weights,))
@@ -334,7 +334,8 @@ class OPTrainer:
                 "OP/eval_ln_std": ln_std,
             }
             self.evaluator.write_log(
-                eval_dict, iter_idx=int(e * self._step_pertimesteps + self._step_pertimesteps)
+                eval_dict,
+                iter_idx=int(e * self._step_pertimesteps + self._step_pertimesteps),
             )
 
             torch.cuda.empty_cache()
@@ -402,7 +403,7 @@ class OPTrainer:
 
         return sample_time
 
-    def savemodel(self, e):
+    def save_model(self, e):
         # save checkpoint
         self.policy.save_model(self.logger.checkpoint_dirs[1], e)
 

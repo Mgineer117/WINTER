@@ -50,11 +50,12 @@ class WINTER:
             max_batch_size=args.max_batch_size,
         )
         self.sampler = OnlineSampler(
-            training_envs=self.env,
+            env=self.env,
             state_dim=args.s_dim,
             action_dim=args.a_dim,
             hc_action_dim=args.num_weights + 1,
             max_option_length=args.max_option_length,
+            num_options=1,
             episode_len=args.episode_len,
             batch_size=args.warm_batch_size,
             min_batch_for_worker=args.min_batch_for_worker,
@@ -75,9 +76,16 @@ class WINTER:
         # param initialization
         self.curr_timesteps = args.SF_epoch * args.step_per_epoch
 
-        images = get_reward_maps(env=env, sf_network=sf_network, V=[reward_options, state_options], feature_dim=args.sf_r_dim+args.sf_s_dim,grid_type=args.grid_type)
+        images = get_reward_maps(
+            env=env,
+            sf_network=sf_network,
+            V=[reward_options, state_options],
+            feature_dim=args.sf_r_dim + args.sf_s_dim,
+            grid_type=args.grid_type,
+        )
         self.logger.write_images(
-            step=self.curr_timesteps, images=images, log_dir="RewardMap/Options")
+            step=self.curr_timesteps, images=images, log_dir="RewardMap/Options"
+        )
 
         # SF checkpoint b/c plotter will only be used
         (
@@ -117,9 +125,7 @@ class WINTER:
         if args.env_name in ("PointNavigation"):
             evaluator_params.update({"gridPlot": False})
 
-        self.op_evaluator = OP_Evaluator(
-            dir=self.op_path, **evaluator_params
-        )
+        self.op_evaluator = OP_Evaluator(dir=self.op_path, **evaluator_params)
         self.hc_evaluator = HC_Evaluator(
             dir=self.hc_path,
             max_option_length=args.max_option_length,
@@ -137,8 +143,10 @@ class WINTER:
         This discovers the eigenvectors via clustering for each of reward and state decompositions.
         --------------------------------------------------------------------------------------------
         """
-        total_batch_size = self.args.op_batch_size * self.args.K_epochs
-        self.sampler.initialize(batch_size=total_batch_size)
+        total_batch_size = int(self.args.op_batch_size * self.args.K_epochs / 2)
+        self.sampler.initialize(
+            batch_size=total_batch_size, num_option=self.args.num_weights
+        )
 
         if not self.args.import_op_model:
             self.op_network = call_opNetwork(
@@ -172,8 +180,8 @@ class WINTER:
         Train Hierarchical Controller to compute optimal policy that alternates between
         options and the random walk.
         """
-        total_batch_size = self.args.hc_batch_size * self.args.K_epochs
-        self.sampler.initialize(batch_size=int(total_batch_size / 2))
+        total_batch_size = int(self.args.hc_batch_size * self.args.K_epochs / 2)
+        self.sampler.initialize(batch_size=total_batch_size, num_option=1)
 
         self.hc_network = call_hcNetwork(self.sf_network, self.op_network, self.args)
         print_model_summary(self.hc_network, model_name="HC model")

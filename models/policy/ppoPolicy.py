@@ -111,7 +111,7 @@ class PPO_Learner(BasePolicy):
         # Compute advantages and returns
         with torch.no_grad():
             values = self.critic(states)
-            _, returns = estimate_advantages(
+            advantages, returns = estimate_advantages(
                 rewards,
                 terminals,
                 values,
@@ -136,22 +136,14 @@ class PPO_Learner(BasePolicy):
         for k in range(self._K):
             indices = torch.randperm(batch_size)[: self.minibatch_size]
             mb_states, mb_actions = states[indices], actions[indices]
-            mb_rewards, mb_terminals = rewards[indices], terminals[indices]
             mb_old_logprobs, mb_returns = old_logprobs[indices], returns[indices]
 
-            # Recompute advantages for the minibatch
-            mb_values = self.critic(mb_states)
-            with torch.no_grad():
-                mb_advantages, _ = estimate_advantages(
-                    mb_rewards,
-                    mb_terminals,
-                    mb_values,
-                    gamma=self._gamma,
-                    gae=self._gae,
-                    device=self.device,
-                )
+            # advantages
+            mb_advantages = advantages[indices]
+            mb_advantages = (mb_advantages - mb_advantages.mean()) / mb_advantages.std()
 
             # 1. Critic Update (with optional regularization)
+            mb_values = self.critic(mb_states)
             value_loss = self.mse_loss(mb_values, mb_returns)
             l2_reg = (
                 sum(param.pow(2).sum() for param in self.critic.parameters())
@@ -230,9 +222,9 @@ class PPO_Learner(BasePolicy):
         # Cleanup
         del states, actions, rewards, terminals, old_logprobs
         torch.cuda.empty_cache()
-        
+
         self.eval()
-        
+
         timesteps = self.minibatch_size * (k + 1)
         update_time = time.time() - t0
         return loss_dict, timesteps, update_time

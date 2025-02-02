@@ -83,7 +83,7 @@ class Base:
     def collect_samples(
         self,
         policy,
-        idx: int = None,
+        option_indices: list | None = [None],
         grid_type: int = 0,
         random_init_pos: bool = False,
         deterministic: bool = False,
@@ -105,29 +105,28 @@ class Base:
             sample_fn = self.collect_trajectory
 
         queue = multiprocessing.Manager().Queue()
-        env_idx = 0
+        idx_idx = 0
         worker_idx = 0
 
         # iterate over rounds
         for round_number in range(self.rounds):
             processes = []
             if round_number == self.rounds - 1:
-                envs = self.training_envs[env_idx:]
+                indices = option_indices[idx_idx:]
             else:
-                envs = self.training_envs[
-                    env_idx : env_idx + self.num_env_per_round[round_number]
+                indices = option_indices[
+                    idx_idx : idx_idx + self.num_idx_per_round[round_number]
                 ]
-
-            # iterate over envs
-            for env in envs:
-                workers_for_env = self.num_workers_per_round[round_number] // len(envs)
-                for i in range(workers_for_env):
+            # iterate over indices
+            for idx in indices:
+                for i in range(self.num_worker_per_idx):
+                    # print(f"total num worker {self.total_num_worker}")
                     if worker_idx == self.total_num_worker - 1:
                         # Main thread process
                         memory = sample_fn(
                             worker_idx,
                             None,
-                            env,
+                            self.env,
                             policy,
                             idx,
                             grid_type,
@@ -140,7 +139,7 @@ class Base:
                         worker_args = (
                             worker_idx,
                             queue,
-                            env,
+                            self.env,
                             policy,
                             idx,
                             grid_type,
@@ -153,22 +152,58 @@ class Base:
                         p.start()
                     worker_idx += 1
                 if worker_idx % self.req_num_workers == 0:
-                    env_idx += 1
+                    idx_idx += 1
             for p in processes:
                 p.join()
 
-        worker_memories = [None] * (worker_idx - 1)
+        # include worker memories in one list
+        worker_memories = [None] * worker_idx
         for _ in range(worker_idx - 1):
             pid, worker_memory = queue.get()
             worker_memories[pid] = worker_memory
+        worker_memories[-1] = memory
 
-        for worker_memory in worker_memories[::-1]:  # concat in order
-            for k in memory:
-                memory[k] = np.concatenate((memory[k], worker_memory[k]), axis=0)
+        # classify the batch according to the option index
+        if self.num_options == 1:
+            ### for option == 1 or non-option based sapling
+            ### we return the batch = {args: value}
+            memory = {}
+            for worker_memory in worker_memories:  # concat in order
+                for key in worker_memory:
+                    if key in memory:
+                        memory[key] = np.concatenate(
+                            (memory[key], worker_memory[key]), axis=0
+                        )
+                    else:
+                        memory[key] = worker_memory[key]
 
-        # concat to the desired batch size
-        for k, v in memory.items():
-            memory[k] = v[: self.batch_size]
+            # concat to the desired batch size
+            for k, v in memory.items():
+                memory[k] = v[: self.batch_size]
+        else:
+            ### for option == n
+            ### we return the batch = {idx: {args: value}}
+            memory_dict = {i: [] for i in range(len(option_indices))}
+            for i, worker_memory in enumerate(worker_memories):
+                option_index = i // self.num_worker_per_idx
+                memory_dict[option_index].append(worker_memory)
+
+            memory = {}
+            # iterate over option idx
+            for i, batch_list in memory_dict.items():
+                stacked_dict = {}
+                for batch in batch_list:
+                    for key, value in batch.items():
+                        if key in stacked_dict:
+                            stacked_dict[key] = np.concatenate(
+                                (stacked_dict[key], value), axis=0
+                            )
+                        else:
+                            stacked_dict[key] = value
+                # cut to the desired size
+                for k, v in stacked_dict.items():
+                    stacked_dict[k] = v[: self.batch_size]
+                memory[i] = stacked_dict
 
         policy.to_device(policy_device)
         t_end = time.time()
@@ -179,11 +214,12 @@ class Base:
 class OnlineSampler(Base):
     def __init__(
         self,
-        training_envs,
+        env,
         state_dim: tuple,
         action_dim: int,
         hc_action_dim: int,
         max_option_length: int,
+        num_options: int,
         episode_len: int,
         batch_size: int,
         min_batch_for_worker: int = 1024,
@@ -194,7 +230,6 @@ class OnlineSampler(Base):
     ) -> None:
         super(Base, self).__init__()
         """
-        !!! This can even handle multi-envoronments !!!
         This computes the ""very"" appropriate parameter for the Monte-Carlo sampling
         given the number of episodes and the given number of cores the runner specified.
         ---------------------------------------------------------------------------------
@@ -213,24 +248,22 @@ class OnlineSampler(Base):
         self.max_option_length = max_option_length
 
         # sampling params
+        self.num_options = num_options
         self.episode_len = episode_len
         self.min_batch_for_worker = min_batch_for_worker
         self.thread_batch_size = self.min_batch_for_worker + 2 * self.episode_len
         self.batch_size = batch_size
 
-        if isinstance(training_envs, List):
-            self.training_envs = training_envs
-        else:
-            self.training_envs = [training_envs]
+        self.env = env
 
-            # Preprocess for multiprocessing to avoid CPU overscription and deadlock
+        # Preprocess for multiprocessing to avoid CPU overscription and deadlock
         self.cpu_preserve_rate = cpu_preserve_rate
         self.temp_cores = floor(multiprocessing.cpu_count() * self.cpu_preserve_rate)
         self.num_cores = num_cores if num_cores is not None else self.temp_cores
 
         (
             num_workers_per_round,
-            num_env_per_round,
+            num_idx_per_round,
             req_num_workers,
             rounds,
         ) = self.calculate_workers_and_rounds()
@@ -238,8 +271,8 @@ class OnlineSampler(Base):
         self.req_num_workers = req_num_workers
         self.num_workers_per_round = num_workers_per_round
         self.total_num_worker = sum(self.num_workers_per_round)
-        self.num_env_per_round = num_env_per_round
-        self.num_worker_per_env = int(self.total_num_worker / len(self.training_envs))
+        self.num_idx_per_round = num_idx_per_round
+        self.num_worker_per_idx = int(self.total_num_worker / self.num_options)
 
         self.rounds = rounds
         if verbose:
@@ -249,21 +282,22 @@ class OnlineSampler(Base):
             print(
                 f"Cores (usage)/(given)     : {self.num_workers_per_round}/{self.num_cores} out of {multiprocessing.cpu_count()}"
             )
-            print(f"# Environments each Round : {self.num_env_per_round}")
-            print(f"Total number of Worker    : {self.total_num_worker}")
-            print(f"Max. batch size           : {self.thread_batch_size}")
+            print(f"# Indices each Round    : {self.num_idx_per_round}")
+            print(f"Total number of Worker  : {self.total_num_worker}")
+            print(f"Max. batch size         : {self.thread_batch_size}")
 
         # enforce one thread for each worker to avoid CPU overscription.
         torch.set_num_threads(1)
 
-    def initialize(self, batch_size, verbose=True):
+    def initialize(self, batch_size: int, num_option: int | None, verbose: bool = True):
         # sampling params
+        self.num_options = num_option
         self.thread_batch_size = self.min_batch_for_worker + 2 * self.episode_len
         self.batch_size = batch_size
 
         (
             num_workers_per_round,
-            num_env_per_round,
+            num_idx_per_round,
             req_num_workers,
             rounds,
         ) = self.calculate_workers_and_rounds()
@@ -271,8 +305,8 @@ class OnlineSampler(Base):
         self.req_num_workers = req_num_workers
         self.num_workers_per_round = num_workers_per_round
         self.total_num_worker = sum(self.num_workers_per_round)
-        self.num_env_per_round = num_env_per_round
-        self.num_worker_per_env = int(self.total_num_worker / len(self.training_envs))
+        self.num_idx_per_round = num_idx_per_round
+        self.num_worker_per_idx = int(self.total_num_worker / self.num_options)
 
         self.rounds = rounds
         if verbose:
@@ -282,9 +316,9 @@ class OnlineSampler(Base):
             print(
                 f"Cores (usage)/(given)     : {self.num_workers_per_round}/{self.num_cores} out of {multiprocessing.cpu_count()}"
             )
-            print(f"# Environments each Round : {self.num_env_per_round}")
-            print(f"Total number of Worker    : {self.total_num_worker}")
-            print(f"Max. batch size           : {self.thread_batch_size}")
+            print(f"# Indices each Round    : {self.num_idx_per_round}")
+            print(f"Total number of Worker  : {self.total_num_worker}")
+            print(f"Max. batch size         : {self.thread_batch_size}")
 
         # enforce one thread for each worker to avoid CPU overscription.
         torch.set_num_threads(1)
@@ -295,21 +329,21 @@ class OnlineSampler(Base):
 
         Returns:
             num_worker_per_round (list): Number of workers per round.
-            num_env_per_round (list): Number of environments per round.
+            num_idx_per_round (list): Number of indices per round.
             rounds (int): Total number of rounds.
         """
         # Calculate required number of workers
         req_num_workers = ceil(self.batch_size / self.min_batch_for_worker)
-        total_num_workers = req_num_workers * len(self.training_envs)
+        total_num_workers = req_num_workers * self.num_options
 
         if total_num_workers > self.num_cores:
-            # Available cores per environment
-            avail_core_per_env = self.num_cores // len(self.training_envs)
+            # Available cores per index
+            avail_core_per_idx = self.num_cores // self.num_options
 
-            # Calculate the number of workers per round per environment
-            max_workers_per_round = avail_core_per_env
+            # Calculate the number of workers per round per index
+            max_workers_per_round = avail_core_per_idx
             num_worker_per_round = []
-            num_env_per_round = []
+            num_idx_per_round = []
             rounds = ceil(total_num_workers / self.num_cores)
 
             remaining_workers = total_num_workers
@@ -318,18 +352,18 @@ class OnlineSampler(Base):
                 workers_this_round = min(remaining_workers, self.num_cores)
                 num_worker_per_round.append(workers_this_round)
 
-                # Calculate the number of environments for this round
-                envs_this_round = ceil(workers_this_round / req_num_workers)
-                num_env_per_round.append(envs_this_round)
+                # Calculate the number of indices for this round
+                indices_this_round = ceil(workers_this_round / req_num_workers)
+                num_idx_per_round.append(indices_this_round)
 
                 remaining_workers -= workers_this_round
         else:
             # All workers can run in a single round
             num_worker_per_round = [total_num_workers]
-            num_env_per_round = [len(self.training_envs)]
+            num_idx_per_round = [self.num_options]
             rounds = 1
 
-        return num_worker_per_round, num_env_per_round, req_num_workers, rounds
+        return num_worker_per_round, num_idx_per_round, req_num_workers, rounds
 
     def collect_trajectory(
         self,

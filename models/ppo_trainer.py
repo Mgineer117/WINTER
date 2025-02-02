@@ -69,9 +69,7 @@ class PPOTrainer:
 
                 elapsed_time = time.time() - start_time
                 avg_time_per_iter = elapsed_time / pbar.n
-                remaining_time = avg_time_per_iter * (
-                     self.timesteps - pbar.n
-                )
+                remaining_time = avg_time_per_iter * (self.timesteps - pbar.n)
 
                 # Update environment steps and calculate time metrics
                 loss_dict["PPO/timesteps"] = pbar.n
@@ -120,7 +118,7 @@ class PPOTrainer:
                     self.last_reward_std.append(eval_dict["PPO/rew_std"])
 
                     self.save_model(pbar.n)
-                
+
             torch.cuda.empty_cache()
 
         self.logger.print(
@@ -129,7 +127,9 @@ class PPOTrainer:
             )
         )
 
-        return self._epoch
+    def evaulate():
+        # will be implemented
+        pass
 
     def write_log(self, logging_dict: dict, step: int):
         # Logging to WandB and Tensorboard
@@ -152,7 +152,7 @@ class PPOTrainer:
             self.logger.write_videos(
                 step=step, images=supp_dict["path_render"], log_dir=path_render_path
             )
-            
+
     def save_model(self, e):
         # save checkpoint
         if e % self.log_interval == 0:

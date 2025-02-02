@@ -45,11 +45,12 @@ class FeatureTrain:
             max_batch_size=args.max_batch_size,
         )
         self.sampler = OnlineSampler(
-            training_envs=self.env,
+            env=self.env,
             state_dim=args.s_dim,
             action_dim=args.a_dim,
             hc_action_dim=args.num_weights + 1,
             max_option_length=args.max_option_length,
+            num_options=1,
             episode_len=args.episode_len,
             batch_size=args.warm_batch_size,
             min_batch_for_worker=args.min_batch_for_worker,

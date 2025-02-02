@@ -344,31 +344,31 @@ def get_args(verbose=True):
     parser.add_argument(
         "--min-batch-for-worker",
         type=int,
-        default=1024,
+        default=512,
         help="Minimum batch size assgined for one worker (thread)",
     )
     parser.add_argument(
         "--op-entropy-scaler",
         type=float,
-        default=1e-4,
+        default=5e-4,
         help="Option policy entropy scaler",
     )
     parser.add_argument(
         "--hc-entropy-scaler",
         type=float,
-        default=5e-4,
+        default=1e-3,
         help="Hierarchical policy entropy scaler",
     )
     parser.add_argument(
         "--sac-entropy-scaler",
         type=float,
-        default=1e-4,
+        default=1e-3,
         help="PPO policy entropy scaler",
     )
     parser.add_argument(
         "--ppo-entropy-scaler",
         type=float,
-        default=1e-4,
+        default=1e-3,
         help="PPO policy entropy scaler",
     )
 

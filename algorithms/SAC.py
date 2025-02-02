@@ -27,13 +27,14 @@ class SAC:
             max_num_trj=args.sac_max_num_traj,
         )
         self.sampler = OnlineSampler(
-            training_envs=self.env,
+            env=self.env,
             state_dim=args.s_dim,
             feature_dim=args.sf_dim,
             action_dim=args.a_dim,
             hc_action_dim=args.num_vector + 1,
             agent_num=args.agent_num,
             max_option_length=args.max_option_length,
+            num_options=1,
             min_cover_option_length=args.min_cover_option_length,
             episode_len=args.episode_len,
             batch_size=args.batch_size,
@@ -93,7 +94,7 @@ class SAC:
         torch.cuda.empty_cache()
 
     def train_sac(self):
-        self.sampler.initialize(batch_size=self.args.sac_batch_size)
+        self.sampler.initialize(batch_size=int(self.args.sac_batch_size / 2))
 
         ### Call network parameters and run
         self.sac_network = call_sacNetwork(self.args)

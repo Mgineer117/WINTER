@@ -3,6 +3,7 @@ import os
 import cv2
 import pickle
 import numpy as np
+from scipy.ndimage import zoom
 import uuid
 import torch
 import torch.nn as nn
@@ -145,11 +146,11 @@ class LASSO(BasePolicy):
             dtype=self._dtype, device=self.device
         )
 
-        # Normalize to have L2 norm = 1
-        self.feature_weights.data = (
-            self.feature_weights.data
-            / self.feature_weights.data.norm(p=2, dim=-1, keepdim=True)
-        )
+        # # Normalize to have L2 norm = 1
+        # self.feature_weights.data = (
+        #     self.feature_weights.data
+        #     / self.feature_weights.data.norm(p=2, dim=-1, keepdim=True)
+        # )
 
         ### Define optimizers
         self.feature_optims = torch.optim.Adam(
@@ -238,9 +239,21 @@ class LASSO(BasePolicy):
 
         lasso_loss = self._lasso_loss_scaler * phi_r_norm
 
+        # gram = torch.matmul(phi_r.t(), phi_r)
+        # identity = torch.eye(gram.size(0), device=self.device, dtype=self._dtype)
+        # diff = gram - identity
+        # orthogonal_loss = 1e-8 * torch.norm(diff, p="fro") ** 2
+
         lasso_penalty = torch.relu(1e-3 * torch.sqrt(r_dim) - phi_r_norm)
 
-        phi_loss = reward_loss + state_loss + weight_loss + lasso_loss + lasso_penalty
+        phi_loss = (
+            reward_loss
+            + state_loss
+            + weight_loss
+            + lasso_loss
+            + lasso_penalty
+            # + orthogonal_loss
+        )
 
         # Plot predicted vs true rewards
         if self._forward_steps % 10 == 0:
@@ -251,6 +264,7 @@ class LASSO(BasePolicy):
             "state_loss": state_loss,
             "weight_loss": weight_loss,
             "lasso_loss": lasso_loss,
+            # "orthogonal_loss": orthogonal_loss,
             "phi_r_norm": phi_r_norm,
             "phi_s_norm": phi_s_norm,
         }
@@ -317,8 +331,8 @@ class LASSO(BasePolicy):
             )
 
             # Update the corresponding subplot
-            ground_truth_images.append(true_image)
-            predicted_images.append(pred_image)
+            ground_truth_images.append(self.get_image(true_image))
+            predicted_images.append(self.get_image(pred_image))
 
         ### create reward plot ###
         x = range(log_num)
@@ -366,7 +380,7 @@ class LASSO(BasePolicy):
         fig, ax = plt.subplots(figsize=(12, 6))
         ax.imshow(
             phi,
-            cmap='viridis',
+            cmap="viridis",
             interpolation="nearest",
         )
         ax.set_title("Feature heatmap")
@@ -382,13 +396,12 @@ class LASSO(BasePolicy):
             canvas.get_width_height()[::-1] + (3,)
         )  # Shape: (height, width, 3)
         plt.close()
-        
 
         return {
             "ground_truth": ground_truth_images,
             "prediction": predicted_images,
             "reward_plot": [reward_pred_img],
-            "feature_plot":[feature_img]
+            "feature_plot": [feature_img],
         }
 
     def learn(self, buffer):
@@ -431,6 +444,7 @@ class LASSO(BasePolicy):
             "SF/reward_loss": phi_loss_dict["reward_loss"].item(),
             "SF/state_loss": phi_loss_dict["state_loss"].item(),
             "SF/weight_loss": phi_loss_dict["weight_loss"].item(),
+            # "SF/orthogonal_loss": phi_loss_dict["orthogonal_loss"].item(),
             "SF/lasso_loss": phi_loss_dict["lasso_loss"].item(),
             "SF/phi_r_norm": phi_loss_dict["phi_r_norm"].item(),
             "SF/phi_s_norm": phi_loss_dict["phi_s_norm"].item(),
@@ -441,6 +455,21 @@ class LASSO(BasePolicy):
         t1 = time.time()
         self.eval()
         return loss_dict, t1 - t0
+
+    def get_image(self, image):
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.imshow(image)
+        plt.tight_layout()
+        # Render the figure to a canvas
+        canvas = FigureCanvas(fig)
+        canvas.draw()
+        # Convert canvas to a NumPy array
+        image = np.frombuffer(canvas.tostring_rgb(), dtype="uint8")
+        image = image.reshape(
+            canvas.get_width_height()[::-1] + (3,)
+        )  # Shape: (height, width, 3)
+        plt.close()
+        return image
 
     def plot_rewards(self, reward_pred, rewards):
         """

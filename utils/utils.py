@@ -301,7 +301,9 @@ def save_dim_to_args(env, args):
     elif isinstance(env.action_space, gym.spaces.Box):
         args.a_dim = int(env.action_space.shape[0])
     args.grid_size = int(args.s_dim[0])
-    args.num_weights = 2 * (args.r_option_num + args.s_option_num*int(args.sf_s_dim != 0))
+    args.num_weights = 2 * (
+        args.r_option_num + args.s_option_num * int(args.sf_s_dim != 0)
+    )
 
     print(f"Problem dimension (|S|/|A|): {args.s_dim}/{args.a_dim}")
     env.close()
@@ -364,7 +366,7 @@ def estimate_advantages(
         prev_advantage = advantages[i, 0]
 
     returns = values + advantages
-    advantages = (advantages - advantages.mean()) / advantages.std()
+    # advantages = (advantages - advantages.mean()) / advantages.std()
     advantages, returns = advantages.to(device), returns.to(device)
     return advantages, returns
 

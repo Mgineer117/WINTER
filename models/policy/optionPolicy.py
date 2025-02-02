@@ -369,9 +369,11 @@ class OP_Controller(BasePolicy):
         for k in range(self._K):
             indices = torch.randperm(batch_size)[: self._minibatch_size]
             mb_states, mb_actions = states[indices], actions[indices]
-            mb_rewards, mb_terminals = rewards[indices], terminals[indices]
             mb_old_logprobs, mb_returns = old_logprobs[indices], returns[indices]
+
+            # advantages
             mb_advantages = advantages[indices]
+            mb_advantages = (mb_advantages - mb_advantages.mean()) / mb_advantages.std()
 
             # 1. Critic Update (with optional regularization)
             mb_values, _ = self.critic(mb_states, z)
@@ -471,9 +473,7 @@ class OP_Controller(BasePolicy):
 
         timesteps = self._minibatch_size * (k + 1)
         update_time = time.time() - t0
-        return (
-            loss_dict, timesteps, update_time
-        )
+        return (loss_dict, timesteps, update_time)
 
     def average_dict_values(self, dict_list):
         if not dict_list:
@@ -496,8 +496,11 @@ class OP_Controller(BasePolicy):
         self.policy = self.policy.cpu()
         self.critic = self.critic.cpu()
         reward_options = self.reward_options.detach().clone().cpu().numpy()
-        state_options = self.state_options.detach().clone().cpu().numpy() if self.state_options is not None else self.state_options
-
+        state_options = (
+            self.state_options.detach().clone().cpu().numpy()
+            if self.state_options is not None
+            else self.state_options
+        )
 
         # save checkpoint
         if is_best:

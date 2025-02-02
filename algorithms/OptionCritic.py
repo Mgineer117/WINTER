@@ -20,13 +20,14 @@ class OptionCritic:
 
         # define buffers and sampler for Monte-Carlo sampling
         self.sampler = OnlineSampler(
-            training_envs=self.env,
+            env=self.env,
             state_dim=args.s_dim,
             feature_dim=args.sf_dim,
             action_dim=args.a_dim,
             hc_action_dim=args.num_vector,
             agent_num=args.agent_num,
             max_option_length=args.max_option_length,
+            num_options=1,
             min_cover_option_length=args.min_cover_option_length,
             episode_len=args.episode_len,
             batch_size=args.batch_size,
@@ -87,7 +88,7 @@ class OptionCritic:
         torch.cuda.empty_cache()
 
     def train_oc(self):
-        self.sampler.initialize(batch_size=self.args.oc_batch_size)
+        self.sampler.initialize(batch_size=int(self.args.oc_batch_size / 2))
 
         ### Call network param and run
         self.oc_network = call_ocNetwork(self.args)

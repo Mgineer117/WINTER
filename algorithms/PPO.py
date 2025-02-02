@@ -21,13 +21,14 @@ class PPO:
         self.env = env
 
         # define buffers and sampler for Monte-Carlo sampling
-        total_batch_size = int(args.ppo_batch_size * args.K_epochs)
+        total_batch_size = int(args.ppo_batch_size * args.K_epochs / 2)
         self.sampler = OnlineSampler(
-            training_envs=self.env,
+            env=self.env,
             state_dim=args.s_dim,
             action_dim=args.a_dim,
             hc_action_dim=args.num_weights + 1,
             max_option_length=args.max_option_length,
+            num_options=1,
             episode_len=args.episode_len,
             batch_size=total_batch_size,
             min_batch_for_worker=args.min_batch_for_worker,
@@ -99,8 +100,6 @@ class PPO:
                 log_interval=self.args.ppo_log_interval,
                 grid_type=self.args.grid_type,
             )
-            final_epoch = ppo_trainer.train()
+            ppo_trainer.train()
         else:
-            final_epoch = self.curr_epoch + self.args.PPO_epoch
-
-        self.curr_epoch += final_epoch
+            ppo_trainer.evaluate()
