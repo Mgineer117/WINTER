@@ -210,7 +210,7 @@ def get_args(verbose=True):
         help="SFs train lr where scheduler is used so can be high",
     )
     parser.add_argument(
-        "--op-policy-lr", type=float, default=1e-3, help="Option network lr"
+        "--op-policy-lr", type=float, default=None, help="Option network lr"
     )
     parser.add_argument(
         "--op-critic-lr",
@@ -221,7 +221,7 @@ def get_args(verbose=True):
     parser.add_argument(
         "--hc-policy-lr",
         type=float,
-        default=3e-4,
+        default=None,
         help="Hierarchical Controller network lr",
     )
     parser.add_argument(
@@ -243,7 +243,7 @@ def get_args(verbose=True):
         help="Hierarchical Policy policy (PPO-based) critic learning rate. If none, BFGS is used.",
     )
     parser.add_argument(
-        "--ppo-policy-lr", type=float, default=3e-4, help="PPO-actor learning rate"
+        "--ppo-policy-lr", type=float, default=None, help="PPO-actor learning rate"
     )
     parser.add_argument(
         "--ppo-critic-lr",
@@ -252,7 +252,7 @@ def get_args(verbose=True):
         help="PPO-critic learning rate. If none, BFGS is used.",
     )
     parser.add_argument(
-        "--sac-policy-lr", type=float, default=3e-4, help="PPO-actor learning rate"
+        "--sac-policy-lr", type=float, default=None, help="PPO-actor learning rate"
     )
     parser.add_argument(
         "--sac-critic-lr",
@@ -344,19 +344,19 @@ def get_args(verbose=True):
     parser.add_argument(
         "--min-batch-for-worker",
         type=int,
-        default=512,
+        default=1024,
         help="Minimum batch size assgined for one worker (thread)",
     )
     parser.add_argument(
         "--op-entropy-scaler",
         type=float,
-        default=5e-4,
+        default=1e-3,
         help="Option policy entropy scaler",
     )
     parser.add_argument(
         "--hc-entropy-scaler",
         type=float,
-        default=1e-3,
+        default=5e-3,
         help="Hierarchical policy entropy scaler",
     )
     parser.add_argument(
@@ -368,7 +368,7 @@ def get_args(verbose=True):
     parser.add_argument(
         "--ppo-entropy-scaler",
         type=float,
-        default=1e-3,
+        default=5e-3,
         help="PPO policy entropy scaler",
     )
 
@@ -536,7 +536,7 @@ def get_args(verbose=True):
 
     # PPO parameters
     parser.add_argument(
-        "--K-epochs", type=int, default=10, help="PPO update per one iter"
+        "--K-epochs", type=int, default=40, help="PPO update per one iter"
     )
     parser.add_argument(
         "--eps-clip", type=float, default=0.2, help="clipping parameter for gradient"

@@ -170,6 +170,7 @@ class OP_Controller(BasePolicy):
         return loss_dict, op_timesteps, update_time
 
     def psuedo_reward(self, states, next_states, z):
+        self.sf_network.eval()
         with torch.no_grad():
             phi = self.sf_network.get_features(states, deterministic=True)
             next_phi = self.sf_network.get_features(next_states, deterministic=True)
@@ -180,12 +181,16 @@ class OP_Controller(BasePolicy):
         if is_reward_option:
             deltaPhi, _ = self.split(deltaPhi, self.sf_r_dim)
             weight = self.reward_options[z]
+            # print(f"z: {z}, is_reward {is_reward_option}, {self.reward_options[z]}")
         else:
             z = z - self.reward_options.shape[0]
             _, deltaPhi = self.split(deltaPhi, self.sf_r_dim)
             weight = self.state_options[z]
+            # print(f"z: {z}, is_reward {is_reward_option}, {self.state_options[z]}")
 
         pseudo_rewards = self.multiply_weights(deltaPhi, weight)
+
+        pseudo_rewards *= 1e2  # (pseudo_rewards + 1e-3) / (1e-3 + 1e-3)
         return pseudo_rewards
 
     def sac_learn(self, batch, z):
@@ -378,11 +383,8 @@ class OP_Controller(BasePolicy):
             # 1. Critic Update (with optional regularization)
             mb_values, _ = self.critic(mb_states, z)
             value_loss = self.mse_loss(mb_values, mb_returns)
-            l2_reg = (
-                sum(param.pow(2).sum() for param in self.critic.parameters())
-                * self._l2_reg
-            )
-            value_loss += l2_reg
+            l2_reg = sum(param.pow(2).sum() for param in self.critic.parameters())
+            value_loss += self._l2_reg * l2_reg
 
             # Track value loss for logging
             value_losses.append(value_loss.item())
@@ -446,7 +448,7 @@ class OP_Controller(BasePolicy):
             "OP_PPO/value_loss": np.mean(value_losses),
             "OP_PPO/entropy_loss": np.mean(entropy_losses),
             "OP_PPO/clip_fraction": np.mean(clip_fractions),
-            "OP_PPO/klDivergence": np.mean(target_kl),
+            "OP_PPO/klDivergence": target_kl[-1],
             f"OP_PPO/avg_reward {z}": rewards.mean().item(),
             "OP_PPO/K-epoch": k + 1,
         }

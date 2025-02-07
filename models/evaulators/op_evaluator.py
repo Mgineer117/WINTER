@@ -110,7 +110,7 @@ class OP_Evaluator(Evaluator):
                     if num_episodes == 0 and self.gridPlot:
                         # final agent pos
                         self.get_agent_pos(env)
-                        
+
                         path_image = self.plotPath()
                         self.path = []
 

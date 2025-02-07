@@ -143,7 +143,7 @@ class WINTER:
         This discovers the eigenvectors via clustering for each of reward and state decompositions.
         --------------------------------------------------------------------------------------------
         """
-        total_batch_size = int(self.args.op_batch_size * self.args.K_epochs / 2)
+        total_batch_size = int(self.args.op_batch_size * self.args.K_epochs)
         self.sampler.initialize(
             batch_size=total_batch_size, num_option=self.args.num_weights
         )
@@ -172,7 +172,9 @@ class WINTER:
 
             self.curr_timesteps = op_trainer.train()
         else:
-            self.op_network = call_opNetwork(self.sf_network, self.args)
+            self.op_network = call_opNetwork(
+                self.sf_network, self.reward_options, self.state_options, self.args
+            )
             self.curr_timesteps = self.curr_timesteps + self.args.OP_timesteps
 
     def train_hc(self):

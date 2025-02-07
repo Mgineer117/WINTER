@@ -109,7 +109,7 @@ class SFTrainer:
                 self.buffer.push(batch)
 
             ### Eval
-            if e % self.log_interval == 0:
+            if (e + 1) % self.log_interval == 0:
                 self.policy.eval()
                 eval_dict = self.policy.evaluate(self.buffer)
                 self.write_image(
@@ -117,7 +117,7 @@ class SFTrainer:
                     step=int(e * self._step_per_epoch + it),
                     log_dir="SF/",
                 )
-
+                self.save_model(e + 1)
                 # self.evaluator(
                 #     self.policy,
                 #     epoch=e,
@@ -125,7 +125,6 @@ class SFTrainer:
                 #     dir_name="SF",
                 #     grid_type=self.grid_type,
                 # )
-                self.save_model(e + 1)
 
         self.buffer.wipe()
         torch.cuda.empty_cache()
@@ -141,8 +140,7 @@ class SFTrainer:
 
     def save_model(self, e):
         # save checkpoint
-        if e % self.log_interval == 0:
-            self.policy.save_model(self.logger.checkpoint_dirs[0], e)
+        self.policy.save_model(self.logger.checkpoint_dirs[0], e)
 
     def warm_buffer(self, post_process: str | None, minimum: bool):
         t0 = time.time()
@@ -190,35 +188,27 @@ class SFTrainer:
             self.writer.add_scalar(key, value, step)
 
     def write_image(self, eval_dict: dict, step: int, log_dir: str):
-        if eval_dict["ground_truth"] is not None:
+        if eval_dict["ground_truth"][0] is not None:
             true_path = log_dir + "true"
             self.logger.write_images(
-            step=step, images=eval_dict["ground_truth"], log_dir=true_path
-        )
-        if eval_dict["prediction"] is not None:
+                step=step, images=eval_dict["ground_truth"], log_dir=true_path
+            )
+        if eval_dict["prediction"][0] is not None:
             pred_path = log_dir + "pred"
             self.logger.write_images(
-            step=step, images=eval_dict["prediction"], log_dir=pred_path
-        )
-        if eval_dict["reward_plot"] is not None:
+                step=step, images=eval_dict["prediction"], log_dir=pred_path
+            )
+        if eval_dict["reward_plot"][0] is not None:
             reward_path = log_dir + "reward_plot"
             self.logger.write_images(
-            step=step,
-            images=eval_dict["reward_plot"],
-            log_dir=reward_path,
-        )
-        if eval_dict["feature_plot"] is not None:
+                step=step,
+                images=eval_dict["reward_plot"],
+                log_dir=reward_path,
+            )
+        if eval_dict["feature_plot"][0] is not None:
             feature_path = log_dir + "feature_plot"
             self.logger.write_images(
-            step=step,
-            images=eval_dict["feature_plot"],
-            log_dir=feature_path,
-        )
-
-
-        
-        
-
-        
-        
-        
+                step=step,
+                images=eval_dict["feature_plot"],
+                log_dir=feature_path,
+            )

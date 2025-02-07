@@ -21,7 +21,7 @@ class PPO:
         self.env = env
 
         # define buffers and sampler for Monte-Carlo sampling
-        total_batch_size = int(args.ppo_batch_size * args.K_epochs / 2)
+        total_batch_size = int(args.ppo_batch_size * args.K_epochs)
         self.sampler = OnlineSampler(
             env=self.env,
             state_dim=args.s_dim,

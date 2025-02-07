@@ -89,6 +89,7 @@ def call_options(
 
     if sf_s_dim != 0:
         # Warm buffer
+        buffer.max_batch_size = int(3e4)
         buffer = warm_buffer(sf_network, sampler, buffer, grid_type)
         samples = buffer.sample_all()
 
@@ -236,7 +237,8 @@ def plotRewardMap(
     for x, y in zip(x_coords, y_coords):
         # # Load the image as a NumPy array
         img = raw_grid.copy()
-        img[x, y, :] = 10  # 10 is an agent
+        img[x, y, 1] = 1
+        img[x, y, 2] = 2
 
         with torch.no_grad():
             img = torch.from_numpy(img).to(torch.float32).to(device_of_model)

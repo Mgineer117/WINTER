@@ -215,17 +215,51 @@ class LASSO(BasePolicy):
         w ~ [1, F/2]
         """
         phi = self.get_features(states)
-        phi_r, phi_s = self.split(phi, self.sf_r_dim)
+        if self.sf_r_dim == 0:
+            reward_loss = self.dummy
 
-        #### auto lasso penalty calculation according to the dimension
-        r_dim = torch.tensor(phi_r.shape[-1], device=self.device)
-        s_dim = torch.tensor(phi_s.shape[-1], device=self.device)
+            state_pred = self.decode(phi, actions)
+            state_loss = self._state_loss_scaler * self.mse_loss(
+                state_pred, next_states
+            )
 
-        reward_pred = self.multiply_weights(phi_r, self.feature_weights)
-        reward_loss = self._reward_loss_scaler * self.mse_loss(reward_pred, rewards)
+            phi_r_norm = self.dummy
+            phi_s_norm = torch.norm(phi, p=1)
 
-        state_pred = self.decode(phi, actions)
-        state_loss = self._state_loss_scaler * self.mse_loss(state_pred, next_states)
+            lasso_loss = self.dummy
+            lasso_penalty = self.dummy
+
+        elif self.sf_s_dim == 0:
+            reward_pred = self.multiply_weights(phi, self.feature_weights)
+            reward_loss = self._reward_loss_scaler * self.mse_loss(reward_pred, rewards)
+
+            state_loss = self.dummy
+
+            r_dim = torch.tensor(phi.shape[-1], device=self.device)
+
+            phi_r_norm = torch.norm(phi, p=1)
+            phi_s_norm = self.dummy
+
+            lasso_loss = self._lasso_loss_scaler * phi_r_norm
+            lasso_penalty = torch.relu(1e-3 * torch.sqrt(r_dim) - phi_r_norm)
+        else:
+            phi_r, phi_s = self.split(phi, self.sf_r_dim)
+
+            reward_pred = self.multiply_weights(phi_r, self.feature_weights)
+            reward_loss = self._reward_loss_scaler * self.mse_loss(reward_pred, rewards)
+
+            state_pred = self.decode(phi_s, actions)
+            state_loss = self._state_loss_scaler * self.mse_loss(
+                state_pred, next_states
+            )
+
+            r_dim = torch.tensor(phi_r.shape[-1], device=self.device)
+
+            phi_r_norm = torch.norm(phi_r, p=1)
+            phi_s_norm = torch.norm(phi_s, p=1)
+
+            lasso_loss = self._lasso_loss_scaler * phi_r_norm
+            lasso_penalty = torch.relu(1e-3 * torch.sqrt(r_dim) - phi_r_norm)
 
         weight_norm = 0
         for param in self.feaNet.parameters():
@@ -234,26 +268,7 @@ class LASSO(BasePolicy):
 
         weight_loss = self._weight_loss_scaler * weight_norm
 
-        phi_r_norm = torch.norm(phi_r, p=1)
-        phi_s_norm = torch.norm(phi_s, p=1)
-
-        lasso_loss = self._lasso_loss_scaler * phi_r_norm
-
-        # gram = torch.matmul(phi_r.t(), phi_r)
-        # identity = torch.eye(gram.size(0), device=self.device, dtype=self._dtype)
-        # diff = gram - identity
-        # orthogonal_loss = 1e-8 * torch.norm(diff, p="fro") ** 2
-
-        lasso_penalty = torch.relu(1e-3 * torch.sqrt(r_dim) - phi_r_norm)
-
-        phi_loss = (
-            reward_loss
-            + state_loss
-            + weight_loss
-            + lasso_loss
-            + lasso_penalty
-            # + orthogonal_loss
-        )
+        phi_loss = reward_loss + state_loss + weight_loss + lasso_loss + lasso_penalty
 
         # Plot predicted vs true rewards
         if self._forward_steps % 10 == 0:
@@ -264,7 +279,6 @@ class LASSO(BasePolicy):
             "state_loss": state_loss,
             "weight_loss": weight_loss,
             "lasso_loss": lasso_loss,
-            # "orthogonal_loss": orthogonal_loss,
             "phi_r_norm": phi_r_norm,
             "phi_s_norm": phi_s_norm,
         }
@@ -303,76 +317,83 @@ class LASSO(BasePolicy):
             reward_feature, state_feature = self.split(phi, self.sf_r_dim)
             reward_preds = self.multiply_weights(reward_feature, self.feature_weights)
 
-        ### decoder reconstructed images ###
-        ground_truth_images = []
-        predicted_images = []
-        for i in range(phi.shape[0]):
-            # Decode the feature and append to reconstructed states
-            with torch.no_grad():
-                true_state = next_states[i]
-                decoded_state = self.decode(phi[i], actions[i])
-                decoded_state = decoded_state.squeeze(0)
+        if self.sf_s_dim != 0:
+            ### decoder reconstructed images ###
+            ground_truth_images = []
+            predicted_images = []
+            for i in range(phi.shape[0]):
+                # Decode the feature and append to reconstructed states
+                with torch.no_grad():
+                    true_state = next_states[i]
+                    decoded_state = self.decode(state_feature[i], actions[i])
+                    decoded_state = decoded_state.squeeze(0)
 
-            # Handle vector data by reshaping into a heatmap
+                # Handle vector data by reshaping into a heatmap
 
-            if decoded_state.dim() == 1:  # If the state is a vector
-                heatmap_data = (
-                    decoded_state.cpu().numpy().reshape(1, -1)
-                )  # Reshape for heatmap
-            else:  # Assume it's already 2D
-                heatmap_data = decoded_state.cpu().numpy()
+                if decoded_state.dim() == 1:  # If the state is a vector
+                    heatmap_data = (
+                        decoded_state.cpu().numpy().reshape(1, -1)
+                    )  # Reshape for heatmap
+                else:  # Assume it's already 2D
+                    heatmap_data = decoded_state.cpu().numpy()
 
-            # Normalize the heatmap data between 0 and 1
-            true_image = (true_state - np.min(true_state)) / (
-                np.max(true_state) - np.min(true_state)
+                # Normalize the heatmap data between 0 and 1
+                true_image = (true_state - np.min(true_state)) / (
+                    np.max(true_state) - np.min(true_state)
+                )
+                pred_image = (heatmap_data - np.min(heatmap_data)) / (
+                    np.max(heatmap_data) - np.min(heatmap_data)
+                )
+
+                # Update the corresponding subplot
+                ground_truth_images.append(self.get_image(true_image))
+                predicted_images.append(self.get_image(pred_image))
+        else:
+            ground_truth_images = [None]
+            predicted_images = [None]
+
+        if self.sf_r_dim != 0:
+            ### create reward plot ###
+            x = range(log_num)
+            fig, ax = plt.subplots(figsize=(12, 6))
+            ax.stem(
+                x,
+                rewards,
+                linefmt="r-",
+                markerfmt="ro",
+                basefmt="k-",
+                label="True Rewards",
             )
-            pred_image = (heatmap_data - np.min(heatmap_data)) / (
-                np.max(heatmap_data) - np.min(heatmap_data)
+            ax.stem(
+                x,
+                reward_preds.cpu().numpy(),
+                linefmt="b-",
+                markerfmt="bo",
+                basefmt="k-",
+                label="Predicted Rewards",
             )
 
-            # Update the corresponding subplot
-            ground_truth_images.append(self.get_image(true_image))
-            predicted_images.append(self.get_image(pred_image))
+            # Set logarithmic y-scale
+            # ax.set_yscale('log')
+            ax.set_xlabel("Reward Index")
+            ax.set_ylabel("Reward")
+            ax.set_title("Predicted vs True Rewards")
+            ax.legend()
+            ax.grid(True, which="both", ls="--", linewidth=0.5)
+            plt.tight_layout()
 
-        ### create reward plot ###
-        x = range(log_num)
-        fig, ax = plt.subplots(figsize=(12, 6))
-        ax.stem(
-            x,
-            rewards,
-            linefmt="r-",
-            markerfmt="ro",
-            basefmt="k-",
-            label="True Rewards",
-        )
-        ax.stem(
-            x,
-            reward_preds.cpu().numpy(),
-            linefmt="b-",
-            markerfmt="bo",
-            basefmt="k-",
-            label="Predicted Rewards",
-        )
+            # Render the figure to a canvas
+            canvas = FigureCanvas(fig)
+            canvas.draw()
 
-        # Set logarithmic y-scale
-        # ax.set_yscale('log')
-        ax.set_xlabel("Reward Index")
-        ax.set_ylabel("Reward")
-        ax.set_title("Predicted vs True Rewards")
-        ax.legend()
-        ax.grid(True, which="both", ls="--", linewidth=0.5)
-        plt.tight_layout()
-
-        # Render the figure to a canvas
-        canvas = FigureCanvas(fig)
-        canvas.draw()
-
-        # Convert canvas to a NumPy array
-        reward_pred_img = np.frombuffer(canvas.tostring_rgb(), dtype="uint8")
-        reward_pred_img = reward_pred_img.reshape(
-            canvas.get_width_height()[::-1] + (3,)
-        )  # Shape: (height, width, 3)
-        plt.close()
+            # Convert canvas to a NumPy array
+            reward_pred_img = np.frombuffer(canvas.tostring_rgb(), dtype="uint8")
+            reward_pred_img = reward_pred_img.reshape(
+                canvas.get_width_height()[::-1] + (3,)
+            )  # Shape: (height, width, 3)
+            plt.close()
+        else:
+            reward_pred_img = None
 
         ### FEATURE IMAGE ###
         phi = phi.cpu().numpy()
@@ -511,7 +532,7 @@ class LASSO(BasePolicy):
 
     def save_model(self, logdir, epoch=None, is_best=False):
         self.feaNet = self.feaNet.cpu()
-        feature_weights = self.feature_weights.clone().cpu()
+        feature_weights = self.feature_weights.detach().clone().cpu()
 
         # save checkpoint
         if is_best:

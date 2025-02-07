@@ -149,7 +149,7 @@ class ConvNetwork(nn.Module):
         )
 
         self.de_feature = MLP(
-            input_dim=sf_r_dim + sf_s_dim,
+            input_dim=sf_s_dim,
             hidden_dims=(fc_dim,),
             activation=self.act,
         )

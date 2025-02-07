@@ -360,23 +360,23 @@ def call_sfNetwork(
                 activation=nn.Tanh(),
             )
 
-        sf_network = LASSO(
-            env_name=args.env_name,
-            feaNet=feaNet,
-            feature_weights=reward_feature_weights,
-            a_dim=args.a_dim,
-            sf_r_dim=args.sf_r_dim,
-            sf_s_dim=args.sf_s_dim,
-            sf_lr=args.sf_lr,
-            batch_size=args.sf_batch_size,
-            reward_loss_scaler=args.reward_loss_scaler,
-            state_loss_scaler=args.state_loss_scaler,
-            weight_loss_scaler=args.weight_loss_scaler,
-            lasso_loss_scaler=args.lasso_loss_scaler,
-            is_discrete=args.is_discrete,
-            sf_path=sf_path,
-            device=args.device,
-        )
+    sf_network = LASSO(
+        env_name=args.env_name,
+        feaNet=feaNet,
+        feature_weights=reward_feature_weights,
+        a_dim=args.a_dim,
+        sf_r_dim=args.sf_r_dim,
+        sf_s_dim=args.sf_s_dim,
+        sf_lr=args.sf_lr,
+        batch_size=args.sf_batch_size,
+        reward_loss_scaler=args.reward_loss_scaler,
+        state_loss_scaler=args.state_loss_scaler,
+        weight_loss_scaler=args.weight_loss_scaler,
+        lasso_loss_scaler=args.lasso_loss_scaler,
+        is_discrete=args.is_discrete,
+        sf_path=sf_path,
+        device=args.device,
+    )
 
     return sf_network
 

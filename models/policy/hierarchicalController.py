@@ -225,7 +225,7 @@ class HC_Controller(BasePolicy):
 
         # List to track policy loss over minibatches
         losses, actor_losses = [], []
-        value_losses, entropy_losses = [], []
+        value_losses, entropy_losses, traj_entropy_losses = [], [], []
 
         clip_fractions, target_kl, grad_dicts = [], [], []
 
@@ -246,11 +246,19 @@ class HC_Controller(BasePolicy):
             value_losses.append(valueLoss.item())
 
             # 2. Policy Update
-            _, _, metaData = self.policy(mb_states)
+            _, option_indices, metaData = self.policy(mb_states)
             # Compute hierarchical policy logprobs and entropy
             logprobs = self.policy.log_prob(metaData["dist"], mb_option_actions)
             entropy = self.policy.entropy(metaData["dist"])
             ratios = torch.exp(logprobs - mb_old_logprobs)
+
+            # compute trj entropy loss
+            option_indices = option_indices.float().view(-1)
+            option_traj_probabilities = F.softmax(option_indices, dim=0)
+            option_traj_entropy = (
+                -0.1
+                * (option_traj_probabilities * option_traj_probabilities.log()).sum()
+            )
 
             # prepare updates
             surr1 = ratios * mb_advantages
@@ -296,11 +304,12 @@ class HC_Controller(BasePolicy):
                         (mb_old_logprobs, mb_pm_old_logprobs[pm_mask]), dim=0
                     )
 
-            loss = actor_loss + 0.5 * valueLoss - entropy_loss
+            loss = actor_loss + 0.5 * valueLoss - entropy_loss - option_traj_entropy
 
             losses.append(loss.item())
             actor_losses.append(actor_loss.item())
             entropy_losses.append(entropy_loss.item())
+            traj_entropy_losses.append(option_traj_entropy.item())
 
             # Compute clip fraction (for logging)
             clip_fraction = torch.mean((torch.abs(ratios - 1) > self._eps).float())
@@ -329,8 +338,9 @@ class HC_Controller(BasePolicy):
             "HC/actor_loss": np.mean(actor_losses),
             "HC/value_loss": np.mean(value_losses),
             "HC/entropy_loss": np.mean(entropy_losses),
+            "HC/traj_entropy_loss": np.mean(traj_entropy_losses),
             "HC/clip_fraction": np.mean(clip_fractions),
-            "HC/klDivergence": np.mean(target_kl),
+            "HC/klDivergence": target_kl[-1],
             "HC/avg_reward": rewards.mean().item(),
             "HC/K-epoch": k + 1,
         }

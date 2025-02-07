@@ -205,7 +205,7 @@ class PPO_Learner(BasePolicy):
             "PPO/value_loss": np.mean(value_losses),
             "PPO/entropy_loss": np.mean(entropy_losses),
             "PPO/clip_fraction": np.mean(clip_fractions),
-            "PPO/klDivergence": np.mean(target_kl),
+            "PPO/klDivergence": target_kl[-1],
             "PPO/avg_reward": rewards.mean().item(),
             "PPO/K-epoch": k + 1,
         }
