@@ -313,7 +313,7 @@ class LASSO(BasePolicy):
         rewards = batch["rewards"][:log_num]
 
         with torch.no_grad():
-            phi, _ = self.get_features(states, deterministic=True)
+            phi = self.get_features(states, deterministic=True)
             reward_feature, state_feature = self.split(phi, self.sf_r_dim)
             reward_preds = self.multiply_weights(reward_feature, self.feature_weights)
 
