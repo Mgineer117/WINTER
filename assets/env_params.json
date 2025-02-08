@@ -252,7 +252,7 @@
     "CtF": {
         "SF_epoch": 1000,
         "step_per_epoch": 100,
-        "OP_timesteps": 3e6,
+        "OP_timesteps": 5e6,
         "HC_timesteps": 1e7,
         "OC_timesteps": 1e7,
         "PPO_timesteps": 1e7,
@@ -286,16 +286,16 @@
             64
         ],
         "op_critic_dim": [
-            128,
-            128
+            256,
+            256
         ],
         "hc_policy_dim": [
             64,
             64
         ],
         "hc_critic_dim": [
-            128,
-            128
+            256,
+            256
         ],
         "oc_fc_dim": 64,
         "oc_termination_dim": [
@@ -303,24 +303,24 @@
             512
         ],
         "oc_critic_dim": [
-            128,
-            128
+            256,
+            256
         ],
         "ppo_policy_dim": [
             64,
             64
         ],
         "ppo_critic_dim": [
-            128,
-            128
+            256,
+            256
         ],
         "sac_policy_dim": [
-            128,
+            64,
             64
         ],
         "sac_critic_dim": [
-            128,
-            128
+            256,
+            256
         ],
         "reward_loss_scaler": 1.0,
         "state_loss_scaler": 1e-1,
@@ -329,7 +329,7 @@
         "episode_len": 150,
         "warm_batch_size": 8192,
         "sf_batch_size": 512,
-        "op_batch_size": 128,
+        "op_batch_size": 256,
         "hc_batch_size": 256,
         "oc_batch_size": 256,
         "ppo_batch_size": 256,

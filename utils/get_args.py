@@ -356,7 +356,7 @@ def get_args(verbose=True):
     parser.add_argument(
         "--hc-entropy-scaler",
         type=float,
-        default=5e-3,
+        default=1e-2,
         help="Hierarchical policy entropy scaler",
     )
     parser.add_argument(
@@ -368,7 +368,7 @@ def get_args(verbose=True):
     parser.add_argument(
         "--ppo-entropy-scaler",
         type=float,
-        default=5e-3,
+        default=1e-3,
         help="PPO policy entropy scaler",
     )
 
@@ -536,7 +536,7 @@ def get_args(verbose=True):
 
     # PPO parameters
     parser.add_argument(
-        "--K-epochs", type=int, default=40, help="PPO update per one iter"
+        "--K-epochs", type=int, default=50, help="PPO update per one iter"
     )
     parser.add_argument(
         "--eps-clip", type=float, default=0.2, help="clipping parameter for gradient"

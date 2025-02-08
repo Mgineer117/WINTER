@@ -29,36 +29,19 @@ class OptionPolicy(nn.Module):
         self._a_dim = a_dim
         self._dtype = torch.float32
 
-        self.logstd_range = (-10, 2)
-
         self.is_discrete = is_discrete
-
-        if self.is_discrete:
-            self.models = nn.ModuleList()
-            for _ in range(num_weights):
-                self.models.append(self.create_model(input_dim, hidden_dim, a_dim))
-        else:
-            self.models = nn.ModuleList()
-            self.mus = nn.ModuleList()
-            self.logstds = nn.ModuleList()
-            for _ in range(num_weights):
-                self.models.append(self.create_model(input_dim, hidden_dim, a_dim))
-                self.mus.append(self.create_mu_model(input_dim, hidden_dim, a_dim))
-                self.logstds.append(
-                    self.create_logstd_model(input_dim, hidden_dim, a_dim)
-                )
+        self.models = nn.ModuleList()
+        for _ in range(num_weights):
+            self.models.append(self.create_model(input_dim, hidden_dim, a_dim))
 
     def create_model(self, input_dim, hidden_dim, output_dim):
-        if self.is_discrete:
-            return MLP(input_dim, hidden_dim, output_dim, activation=self.act)
-        else:
-            return MLP(input_dim, hidden_dim[:-1], activation=self.act)
-
-    def create_mu_model(self, input_dim, hidden_dim, output_dim):
-        return MLP(hidden_dim[-1], (output_dim,), activation=nn.Identity())
-
-    def create_logstd_model(self, input_dim, hidden_dim, output_dim):
-        return MLP(hidden_dim[-1], (output_dim,), activation=nn.Identity())
+        return MLP(
+            input_dim,
+            hidden_dim,
+            output_dim,
+            activation=self.act,
+            initialization="actor",
+        )
 
     def forward(self, state: torch.Tensor, z: int, deterministic=False):
         # when the input is raw by forawrd() not learn()
@@ -79,12 +62,8 @@ class OptionPolicy(nn.Module):
             probs = torch.sum(probs * a, dim=-1)
         else:
             ### Shape the output as desired
-            mu = F.tanh(self.mus[z](logits))
-            logstd = torch.clamp(
-                self.logstds[z](logits),
-                min=self.logstd_range[0],
-                max=self.logstd_range[1],
-            )
+            mu = F.tanh(logits)
+            logstd = torch.zeros_like(mu)
             std = torch.exp(logstd)
 
             covariance_matrix = torch.diag_embed(std**2)  # Variance is std^2
@@ -150,7 +129,13 @@ class OptionCritic(nn.Module):
             self.models.append(self.create_model(input_dim, hidden_dim, 1))
 
     def create_model(self, input_dim, hidden_dim, output_dim):
-        return MLP(input_dim, hidden_dim, output_dim, activation=self.act)
+        return MLP(
+            input_dim,
+            hidden_dim,
+            output_dim,
+            activation=self.act,
+            initialization="critic",
+        )
 
     def forward(self, state: torch.Tensor, z: int):
         # when the input is raw by forawrd() not learn()

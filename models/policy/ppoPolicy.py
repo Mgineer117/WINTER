@@ -206,7 +206,7 @@ class PPO_Learner(BasePolicy):
             "PPO/entropy_loss": np.mean(entropy_losses),
             "PPO/clip_fraction": np.mean(clip_fractions),
             "PPO/klDivergence": target_kl[-1],
-            "PPO/avg_reward": rewards.mean().item(),
+            "PPO/avg_rewards": (torch.sum(rewards) / torch.sum(terminals)).item(),
             "PPO/K-epoch": k + 1,
         }
         grad_dict = self.average_dict_values(grad_dicts)

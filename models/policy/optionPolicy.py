@@ -449,7 +449,9 @@ class OP_Controller(BasePolicy):
             "OP_PPO/entropy_loss": np.mean(entropy_losses),
             "OP_PPO/clip_fraction": np.mean(clip_fractions),
             "OP_PPO/klDivergence": target_kl[-1],
-            f"OP_PPO/avg_reward {z}": rewards.mean().item(),
+            f"OP_PPO/avg_rewards{z}": (
+                torch.sum(rewards) / torch.sum(terminals)
+            ).item(),
             "OP_PPO/K-epoch": k + 1,
         }
         grad_dict = self.average_dict_values(grad_dicts)

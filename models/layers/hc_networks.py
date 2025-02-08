@@ -30,7 +30,13 @@ class HC_Policy(nn.Module):
         self._a_dim = hc_action_dim
         self._dtype = torch.float32
 
-        self.model = MLP(input_dim, hidden_dim, self._a_dim, activation=self.act)
+        self.model = MLP(
+            input_dim,
+            hidden_dim,
+            self._a_dim,
+            activation=self.act,
+            initialization="actor",
+        )
 
     def forward(self, state: torch.Tensor, deterministic=False):
         # when the input is raw by forawrd() not learn()
@@ -38,7 +44,8 @@ class HC_Policy(nn.Module):
             state = state.unsqueeze(0)
             state = state.reshape(state.shape[0], -1)
 
-        logits = self.model(state)
+        raw_logits = self.model(state)
+        logits = F.softplus(raw_logits)
 
         probs = F.softmax(logits, dim=-1)
         dist = Categorical(probs)
@@ -87,7 +94,9 @@ class HC_Critic(nn.Module):
 
         # |A| duplicate networks
         self.act = activation
-        self.model = MLP(input_dim, hidden_dim, 1, activation=self.act)
+        self.model = MLP(
+            input_dim, hidden_dim, 1, activation=self.act, initialization="critic"
+        )
 
     def forward(self, x: torch.Tensor):
         value = self.model(x)
@@ -118,21 +127,19 @@ class HC_PPO(nn.Module):
         # |A| duplicate networks
         self.act = activation
 
-        if self.is_discrete:
-            self.model = MLP(input_dim, hidden_dim, a_dim, activation=self.act)
-        else:
-            self.model = MLP(input_dim, hidden_dim[:-1], activation=self.act)
-            self.mu = MLP(hidden_dim[-1], (a_dim,), activation=nn.Identity())
-            self.logstd = MLP(hidden_dim[-1], (a_dim,), activation=nn.Identity())
+        self.model = MLP(
+            input_dim, hidden_dim, a_dim, activation=self.act, initialization="actor"
+        )
 
     def forward(self, state: torch.Tensor, deterministic: bool = False):
         if len(state.shape) == 3 or len(state.shape) == 1:
             state = state.unsqueeze(0)
             state = state.reshape(state.shape[0], -1)
 
-        logits = self.model(state)
+        raw_logits = self.model(state)
 
         if self.is_discrete:
+            logits = F.softplus(raw_logits)
             probs = F.softmax(logits, dim=-1)
             dist = Categorical(probs)
 
@@ -147,10 +154,8 @@ class HC_PPO(nn.Module):
 
         else:
             ### Shape the output as desired
-            mu = F.tanh(self.mu(logits))
-            logstd = torch.clamp(
-                self.logstd(logits), min=self.logstd_range[0], max=self.logstd_range[1]
-            )
+            mu = F.tanh(raw_logits)
+            logstd = torch.zeros_like(mu)
             std = torch.exp(logstd)
 
             covariance_matrix = torch.diag_embed(std**2)  # Variance is std^2

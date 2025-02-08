@@ -28,16 +28,10 @@ class PPO_Policy(nn.Module):
         self._a_dim = a_dim
         self._dtype = torch.float32
 
-        self.logstd_range = (-10, 2)
-
         self.is_discrete = is_discrete
-
-        if self.is_discrete:
-            self.model = MLP(input_dim, hidden_dim, a_dim, activation=self.act)
-        else:
-            self.model = MLP(input_dim, hidden_dim[:-1], activation=self.act)
-            self.mu = MLP(hidden_dim[-1], (a_dim,), activation=nn.Identity())
-            self.logstd = MLP(hidden_dim[-1], (a_dim,), activation=nn.Identity())
+        self.model = MLP(
+            input_dim, hidden_dim, a_dim, activation=self.act, initialization="actor"
+        )
 
     def forward(self, state: torch.Tensor, deterministic: bool = False):
         if len(state.shape) == 3 or len(state.shape) == 1:
@@ -61,10 +55,8 @@ class PPO_Policy(nn.Module):
 
         else:
             ### Shape the output as desired
-            mu = F.tanh(self.mu(logits))
-            logstd = torch.clamp(
-                self.logstd(logits), min=self.logstd_range[0], max=self.logstd_range[1]
-            )
+            mu = F.tanh(logits)
+            logstd = torch.zeros_like(mu)
             std = torch.exp(logstd)
 
             covariance_matrix = torch.diag_embed(std**2)  # Variance is std^2
@@ -120,7 +112,9 @@ class PPO_Critic(nn.Module):
         self.act = activation
         self._dtype = torch.float32
 
-        self.model = MLP(input_dim, hidden_dim, 1, activation=self.act)
+        self.model = MLP(
+            input_dim, hidden_dim, 1, activation=self.act, initialization="critic"
+        )
 
     def forward(self, x: torch.Tensor):
         value = self.model(x)

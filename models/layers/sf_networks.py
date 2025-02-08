@@ -4,7 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from torch.nn import MaxPool2d, MaxUnpool2d
-from utils.utils import calculate_flatten_size, check_output_padding_needed
+from torch.distributions import MultivariateNormal
+from utils.utils import calculate_flatten_size
 from models.layers.building_blocks import MLP, Conv, DeConv
 
 
@@ -356,6 +357,159 @@ class AutoEncoder(nn.Module):
         """This reconstruct full state given phi_state and actions"""
         out1 = self.de_latent(phi)
         out2 = self.de_action(actions)
+
+        out = torch.cat((out1, out2), axis=-1)
+        reconstructed_state = self.decoder(out)
+        return reconstructed_state
+
+
+class VAE(nn.Module):
+    """
+    State encoding module
+    -----------------------------------------
+    1. Define each specific layer for encoder and decoder
+    2. Use nn.Sequential in the end to sequentialize each networks
+    """
+
+    def __init__(
+        self,
+        state_dim: tuple,
+        action_dim: int,
+        sf_r_dim: int,
+        sf_s_dim: int,
+        fc_dim: int = 256,
+        sf_dim: int = 256,
+        activation: nn.Module = nn.ReLU(),
+    ):
+        super(VAE, self).__init__()
+
+        if len(state_dim) == 3:
+            first_dim, second_dim, in_channels = state_dim
+        elif len(state_dim) == 1:
+            first_dim = state_dim[0]
+            second_dim = 1
+            in_channels = 1
+        else:
+            raise ValueError("State dimension is not correct.")
+
+        input_dim = int(first_dim * second_dim * in_channels)
+
+        # Parameters
+        self.sf_r_dim = sf_r_dim
+        self.sf_s_dim = sf_s_dim
+        self.fc_dim = fc_dim
+        self.sf_dim = sf_dim
+
+        self.logstd_range = (-5, 2)
+
+        # Activation functions
+        self.act = activation
+
+        ### Encoding module
+        self.flatter = nn.Flatten()
+
+        self.en_vae = MLP(
+            input_dim=input_dim,
+            hidden_dims=(fc_dim, fc_dim, fc_dim),
+            activation=nn.ELU(),
+        )
+
+        # self.encoder = nn.Sequential(self.flatter, self.tensorEmbed, self.en_vae)
+        self.encoder = nn.Sequential(self.flatter, self.en_vae)
+
+        self.mu = MLP(
+            input_dim=fc_dim,
+            hidden_dims=(sf_dim,),
+            activation=nn.ELU(),
+        )
+        self.logstd = MLP(
+            input_dim=fc_dim,
+            hidden_dims=(sf_dim,),
+            activation=nn.Softplus(),
+        )
+
+        ### Decoding module
+        self.de_latent = MLP(
+            input_dim=self.sf_s_dim,
+            hidden_dims=(fc_dim,),
+            activation=nn.ELU(),
+        )
+
+        self.de_action = MLP(
+            input_dim=action_dim,
+            hidden_dims=(fc_dim,),
+            activation=nn.ELU(),
+        )
+
+        self.concat = MLP(
+            input_dim=int(2 * fc_dim),
+            hidden_dims=(fc_dim,),
+            activation=nn.ELU(),
+        )
+
+        self.de_vae = MLP(
+            input_dim=fc_dim,
+            hidden_dims=(fc_dim, fc_dim, fc_dim),
+            output_dim=input_dim,
+            activation=nn.ELU(),
+        )
+
+        self.decoder = nn.Sequential(self.concat, self.de_vae)
+
+    def forward(self, state: torch.Tensor, deterministic=True):
+        """
+        Input = x: 1D or 2D tensor arrays
+        """
+        # 1D -> 2D for consistency
+        if len(state.shape) == 1:
+            state = state.unsqueeze(0)
+        print(state.shape)
+        out = self.flatter(state)
+        print(out.shape)
+        out = self.encoder(out)
+
+        if deterministic:
+            feature = F.tanh(self.mu(out))
+            kl_loss = torch.tensor(0.0).to(feature.device)
+        else:
+            mu = F.tanh(self.mu(out))
+            logstd = torch.clamp(
+                self.logstd(out),
+                min=self.logstd_range[0],
+                max=self.logstd_range[1],
+            )
+
+            std = torch.exp(logstd)
+            cov = torch.diag_embed(std**2)
+
+            dist = MultivariateNormal(loc=mu, covariance_matrix=cov)
+
+            feature = dist.rsample()
+
+            # feature = torch.concatenate((mu_reward, state_feature), axis=-1)
+
+            # if self.sf_s_dim == 0:
+
+            # mu_reward, mu_state = mu[:, : self.sf_r_dim], mu[:, self.sf_s_dim :]
+            # logstd_reward, logstd_state = logstd[:, :dim_half], logstd[:, dim_half:]
+
+            # state_std = torch.exp(logstd_state)
+            # state_cov = torch.diag_embed(state_std**2)
+
+            # dist = MultivariateNormal(loc=mu_state, covariance_matrix=state_cov)
+
+            # state_feature = dist.rsample()
+            # feature = torch.concatenate((mu_reward, state_feature), axis=-1)
+
+            kl = -0.5 * torch.sum(1 + torch.log(std**2) - mu**2 - std**2, dim=-1)
+            kl_loss = torch.mean(kl)
+
+        return feature, {"loss": kl_loss}
+
+    def decode(self, features, actions):
+        """This reconstruct full state given phi_state and actions"""
+        out2 = self.de_latent(features)
+        out1 = self.de_action(actions)
 
         out = torch.cat((out1, out2), axis=-1)
         reconstructed_state = self.decoder(out)
