@@ -275,15 +275,13 @@ class AutoEncoder(nn.Module):
         self,
         state_dim: tuple,
         action_dim: int,
+        sf_r_dim: int,
+        sf_s_dim: int,
         fc_dim: int = 256,
-        sf_dim: int = 256,
         activation: nn.Module = nn.ELU(),
     ):
         super(AutoEncoder, self).__init__()
 
-        first_dim: int
-        second_dim: int
-        in_channels: int
         if len(state_dim) == 3:
             first_dim, second_dim, in_channels = state_dim
         elif len(state_dim) == 1:
@@ -296,7 +294,11 @@ class AutoEncoder(nn.Module):
         input_dim = int(first_dim * second_dim * in_channels)
 
         # Parameters
-        self.logstd_range = (-10, 2)
+        self.sf_r_dim = sf_r_dim
+        self.sf_s_dim = sf_s_dim
+        self.fc_dim = fc_dim
+
+        self.logstd_range = (-5, 2)
 
         # Activation functions
         self.act = activation
@@ -307,18 +309,18 @@ class AutoEncoder(nn.Module):
         self.encoder = MLP(
             input_dim=input_dim,
             hidden_dims=(fc_dim, fc_dim, fc_dim),
-            output_dim=sf_dim,
+            output_dim=sf_r_dim + sf_s_dim,
             activation=self.act,
         )
 
-        self.encoder_filter = nn.ReLU()
+        self.encoder_filter = nn.Sigmoid()
 
         # self.encoder = nn.Sequential(self.flatter, self.tensorEmbed, self.en_vae)
         self.encoder = nn.Sequential(self.flatter, self.encoder, self.encoder_filter)
 
         ### Decoding module
         self.de_latent = MLP(
-            input_dim=sf_dim,
+            input_dim=sf_s_dim,
             hidden_dims=(int(fc_dim / 2),),
             activation=self.act,
         )

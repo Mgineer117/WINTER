@@ -333,7 +333,7 @@ def call_sfNetwork(
                 bold=True,
             )
             print(msg)
-            feaNet = VAE(
+            feaNet = AutoEncoder(
                 state_dim=args.s_dim,
                 action_dim=args.a_dim,
                 fc_dim=args.sf_fc_dim,

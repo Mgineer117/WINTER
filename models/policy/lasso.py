@@ -200,11 +200,11 @@ class LASSO(BasePolicy):
         deterministic: bool = False,
         to_numpy: bool = False,
     ):
-        phi, phi_dict = self.feaNet(states, deterministic=deterministic)
+        phi, _ = self.feaNet(states, deterministic=deterministic)
         if to_numpy:
             phi = phi.cpu().numpy()
 
-        return phi, phi_dict
+        return phi
 
     def phi_Loss(self, states, actions, next_states, rewards):
         """
