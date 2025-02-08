@@ -87,12 +87,13 @@ def call_env(args):
             render_mode="rgb_array",
             width=1024,
             height=1024,
+            max_episode_steps=args.episode_len,
             camera_name="fixedfar",
         )
 
         disc_or_cont(env, args)
         args.agent_num = 1
-        return NavigationWrapper(env)
+        return NavigationWrapper(env, args)
     elif args.env_name == "InvertedPendulum":
         env = gym.make(
             "InvertedPendulum-v4",

@@ -392,7 +392,7 @@ def warm_buffer(
     sample_time = 0
     while buffer.num_samples < buffer.max_batch_size:
         batch, sampleT = sampler.collect_samples(
-            sf_network, grid_type=grid_type, random_init_pos=True
+            sf_network, grid_type=grid_type
         )
         buffer.push(batch)
         sample_time += sampleT

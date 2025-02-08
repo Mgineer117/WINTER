@@ -378,7 +378,6 @@ class VAE(nn.Module):
         sf_r_dim: int,
         sf_s_dim: int,
         fc_dim: int = 256,
-        sf_dim: int = 256,
         activation: nn.Module = nn.ReLU(),
     ):
         super(VAE, self).__init__()
@@ -398,7 +397,6 @@ class VAE(nn.Module):
         self.sf_r_dim = sf_r_dim
         self.sf_s_dim = sf_s_dim
         self.fc_dim = fc_dim
-        self.sf_dim = sf_dim
 
         self.logstd_range = (-5, 2)
 
@@ -411,7 +409,7 @@ class VAE(nn.Module):
         self.en_vae = MLP(
             input_dim=input_dim,
             hidden_dims=(fc_dim, fc_dim, fc_dim),
-            activation=nn.ELU(),
+            activation=self.act,
         )
 
         # self.encoder = nn.Sequential(self.flatter, self.tensorEmbed, self.en_vae)
@@ -419,12 +417,12 @@ class VAE(nn.Module):
 
         self.mu = MLP(
             input_dim=fc_dim,
-            hidden_dims=(sf_dim,),
-            activation=nn.ELU(),
+            hidden_dims=(sf_r_dim + sf_s_dim,),
+            activation=self.act,
         )
         self.logstd = MLP(
             input_dim=fc_dim,
-            hidden_dims=(sf_dim,),
+            hidden_dims=(sf_r_dim + sf_s_dim,),
             activation=nn.Softplus(),
         )
 
@@ -432,26 +430,26 @@ class VAE(nn.Module):
         self.de_latent = MLP(
             input_dim=self.sf_s_dim,
             hidden_dims=(fc_dim,),
-            activation=nn.ELU(),
+            activation=self.act,
         )
 
         self.de_action = MLP(
             input_dim=action_dim,
             hidden_dims=(fc_dim,),
-            activation=nn.ELU(),
+            activation=self.act,
         )
 
         self.concat = MLP(
             input_dim=int(2 * fc_dim),
             hidden_dims=(fc_dim,),
-            activation=nn.ELU(),
+            activation=self.act,
         )
 
         self.de_vae = MLP(
             input_dim=fc_dim,
             hidden_dims=(fc_dim, fc_dim, fc_dim),
             output_dim=input_dim,
-            activation=nn.ELU(),
+            activation=self.act,
         )
 
         self.decoder = nn.Sequential(self.concat, self.de_vae)
@@ -463,9 +461,8 @@ class VAE(nn.Module):
         # 1D -> 2D for consistency
         if len(state.shape) == 1:
             state = state.unsqueeze(0)
-        print(state.shape)
+
         out = self.flatter(state)
-        print(out.shape)
         out = self.encoder(out)
 
         if deterministic:

@@ -317,7 +317,7 @@ def call_ocNetwork(args):
 def call_sfNetwork(
     args, reward_feature_weights: np.ndarray, sf_path: str | None = None
 ):
-    from models.layers.sf_networks import AutoEncoder, ConvNetwork
+    from models.layers.sf_networks import AutoEncoder, VAE, ConvNetwork
     from models.policy import LASSO
 
     if args.import_sf_model:
@@ -333,12 +333,13 @@ def call_sfNetwork(
                 bold=True,
             )
             print(msg)
-            feaNet = AutoEncoder(
+            feaNet = VAE(
                 state_dim=args.s_dim,
                 action_dim=args.a_dim,
-                fc_dim=args.feature_fc_dim,
-                sf_dim=args.sf_dim,
-                activation=nn.Tanh(),
+                fc_dim=args.sf_fc_dim,
+                sf_r_dim=args.sf_r_dim,
+                sf_s_dim=args.sf_s_dim,
+                activation=nn.ELU(),
             )
         else:
             msg = colorize(

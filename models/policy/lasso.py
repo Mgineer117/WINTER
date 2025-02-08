@@ -200,11 +200,11 @@ class LASSO(BasePolicy):
         deterministic: bool = False,
         to_numpy: bool = False,
     ):
-        phi, _ = self.feaNet(states, deterministic=deterministic)
+        phi, phi_dict = self.feaNet(states, deterministic=deterministic)
         if to_numpy:
             phi = phi.cpu().numpy()
 
-        return phi
+        return phi, phi_dict
 
     def phi_Loss(self, states, actions, next_states, rewards):
         """
@@ -214,7 +214,7 @@ class LASSO(BasePolicy):
         phi ~ [N, F/2]
         w ~ [1, F/2]
         """
-        phi = self.get_features(states)
+        phi, phi_dict = self.get_features(states)
         if self.sf_r_dim == 0:
             reward_loss = self.dummy
 
@@ -268,7 +268,7 @@ class LASSO(BasePolicy):
 
         weight_loss = self._weight_loss_scaler * weight_norm
 
-        phi_loss = reward_loss + state_loss + weight_loss + lasso_loss + lasso_penalty
+        phi_loss = reward_loss + state_loss + weight_loss + lasso_loss + lasso_penalty + phi_dict['loss']
 
         # Plot predicted vs true rewards
         if self._forward_steps % 10 == 0:
@@ -313,7 +313,7 @@ class LASSO(BasePolicy):
         rewards = batch["rewards"][:log_num]
 
         with torch.no_grad():
-            phi = self.get_features(states, deterministic=True)
+            phi, _ = self.get_features(states, deterministic=True)
             reward_feature, state_feature = self.split(phi, self.sf_r_dim)
             reward_preds = self.multiply_weights(reward_feature, self.feature_weights)
 

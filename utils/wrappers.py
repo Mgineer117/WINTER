@@ -81,9 +81,10 @@ class CtFWrapper(gym.Wrapper):
 
 
 class NavigationWrapper(gym.Wrapper):
-    def __init__(self, env: gym.Env, cost_scaler: float = 1e-1):
+    def __init__(self, env: gym.Env, args: float = 1e-1):
         super(NavigationWrapper, self).__init__(env)
-        self.cost_scaler = cost_scaler
+        save_dim_to_args(env, args)  # given env, save its state and action dim
+        self.cost_scaler = args.cost_scaler
 
     def get_agent_pos(self):
         return np.array([0, 0])

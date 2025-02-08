@@ -38,7 +38,7 @@ class PointNavigationEnv(BaseTask):
         self._add_geoms(Walls(num=4, locate_factor=1.25))
         self._add_geoms(
             Pillars(
-                num=9,
+                num=8,
                 size=0.1,
                 height=0.1,
                 keepout=0.1,
@@ -48,7 +48,6 @@ class PointNavigationEnv(BaseTask):
                     (-0.6, -0.5),
                     (-0.4, -0.5),
                     (-0.2, -0.5),
-                    (0.4, -0.5),
                     (0.6, -0.5),
                     (0.8, -0.5),
                     (1.0, -0.5),
@@ -58,10 +57,11 @@ class PointNavigationEnv(BaseTask):
         )
         self._add_mocaps(
             Gremlins(
-                num=2,
-                placements=[(-0.7, -0.2, 0.7, 0.7)],
-                travel=0.45,
+                num=1,
+                placements=[(-0.4, -0.2, 0.2, 0.5)],
+                travel=0.4,
                 keepout=0.3,
+                contact_cost=0.05,
             )
         )
 
