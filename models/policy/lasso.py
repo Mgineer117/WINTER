@@ -214,7 +214,7 @@ class LASSO(BasePolicy):
         phi ~ [N, F/2]
         w ~ [1, F/2]
         """
-        phi, phi_dict = self.get_features(states)
+        phi = self.get_features(states)
         if self.sf_r_dim == 0:
             reward_loss = self.dummy
 
@@ -268,7 +268,7 @@ class LASSO(BasePolicy):
 
         weight_loss = self._weight_loss_scaler * weight_norm
 
-        phi_loss = reward_loss + state_loss + weight_loss + lasso_loss + lasso_penalty + phi_dict['loss']
+        phi_loss = reward_loss + state_loss + weight_loss + lasso_loss + lasso_penalty
 
         # Plot predicted vs true rewards
         if self._forward_steps % 10 == 0:

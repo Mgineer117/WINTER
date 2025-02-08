@@ -36,7 +36,7 @@ def get_args(verbose=True):
 
     ### WandB and Logging parameters
     parser.add_argument(
-        "--project", type=str, default="Sgym", help="WandB project classification"
+        "--project", type=str, default="Exp", help="WandB project classification"
     )
     parser.add_argument(
         "--logdir", type=str, default="log/train_log", help="name of the logging folder"
@@ -94,7 +94,7 @@ def get_args(verbose=True):
     parser.add_argument(
         "--env-name",
         type=str,
-        default="PointNavigation",
+        default="CtF",
         help="This specifies which environment one is working with= FourRooms or CtF1v1, CtF1v2}",
     )
     parser.add_argument(
@@ -344,7 +344,7 @@ def get_args(verbose=True):
     parser.add_argument(
         "--min-batch-for-worker",
         type=int,
-        default=1024,
+        default=2048,
         help="Minimum batch size assgined for one worker (thread)",
     )
     parser.add_argument(
