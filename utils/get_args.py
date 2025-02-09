@@ -536,13 +536,13 @@ def get_args(verbose=True):
 
     # PPO parameters
     parser.add_argument(
-        "--K-epochs", type=int, default=50, help="PPO update per one iter"
+        "--K-epochs", type=int, default=None, help="PPO update per one iter"
     )
     parser.add_argument(
         "--eps-clip", type=float, default=0.2, help="clipping parameter for gradient"
     )
     parser.add_argument(
-        "--target-kl", type=float, default=0.03, help="clipping parameter for gradient"
+        "--target-kl", type=float, default=None, help="clipping parameter for gradient"
     )
     parser.add_argument(
         "--gae",
