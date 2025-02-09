@@ -38,8 +38,10 @@ class WandbLogger(BaseLogger):
         name: str = None,
         log_dir: str = "log",
         log_txt: bool = True,
+        fps: int = 10
     ) -> None:
         super().__init__(log_dir, log_txt, name)
+        self.fps = fps
         self.wandb_run = (
             wandb.init(
                 project=project,
@@ -100,7 +102,7 @@ class WandbLogger(BaseLogger):
         images = np.transpose(images, (0, 3, 1, 2))  # Convert to (time, 3, H, W)
 
         # Log the video to wandb
-        wandb.log({f"{log_dir}": wandb.Video(images, fps=10)}, step=step)
+        wandb.log({f"{log_dir}": wandb.Video(images, fps=self.fps)}, step=step)
 
     def restore_data(self) -> None:
         """Not implemented yet"""

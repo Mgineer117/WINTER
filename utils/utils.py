@@ -334,7 +334,7 @@ def setup_logger(args, unique_id, seed):
     args.logdir = os.path.join(args.logdir, args.group)
 
     default_cfg = vars(args)
-    logger = WandbLogger(default_cfg, args.project, args.group, args.name, args.logdir)
+    logger = WandbLogger(default_cfg, args.project, args.group, args.name, args.logdir, True, args.render_fps)
     logger.save_config(default_cfg, verbose=args.verbose)
 
     tensorboard_path = os.path.join(logger.log_dir, "tensorboard")

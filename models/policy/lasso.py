@@ -346,8 +346,9 @@ class LASSO(BasePolicy):
                 )
 
                 # Update the corresponding subplot
-                ground_truth_images.append(self.get_image(true_image))
-                predicted_images.append(self.get_image(pred_image))
+                true_image, pred_image = self.get_image(true_image, pred_image)
+                ground_truth_images.append(true_image)
+                predicted_images.append(pred_image)
         else:
             ground_truth_images = [None]
             predicted_images = [None]
@@ -477,20 +478,67 @@ class LASSO(BasePolicy):
         self.eval()
         return loss_dict, t1 - t0
 
-    def get_image(self, image):
-        fig, ax = plt.subplots(figsize=(12, 6))
-        ax.imshow(image)
-        plt.tight_layout()
-        # Render the figure to a canvas
-        canvas = FigureCanvas(fig)
-        canvas.draw()
-        # Convert canvas to a NumPy array
-        image = np.frombuffer(canvas.tostring_rgb(), dtype="uint8")
-        image = image.reshape(
-            canvas.get_width_height()[::-1] + (3,)
-        )  # Shape: (height, width, 3)
-        plt.close()
-        return image
+    def get_image(self, true_image, pred_image):
+        is_image = True if len(true_image.shape) == 3 else False
+        
+        if is_image:
+            img_list = []
+            for img in [true_image, pred_image]:
+                fig, ax = plt.subplots(figsize=(10, 6))
+                ax.imshow(img)
+                plt.tight_layout()
+                # Render the figure to a canvas
+                canvas = FigureCanvas(fig)
+                canvas.draw()
+                # Convert canvas to a NumPy array
+                image = np.frombuffer(canvas.tostring_rgb(), dtype="uint8")
+                image = image.reshape(
+                    canvas.get_width_height()[::-1] + (3,)
+                )  # Shape: (height, width, 3)
+                img_list.append(image)
+                plt.close()
+            true_image = img_list[0]
+            pred_image = img_list[1]
+        else:
+            true_image = true_image.flatten()
+            pred_image = pred_image.flatten()
+
+            # Plot stem
+            fig, ax = plt.subplots(figsize=(10, 6))
+            x = range(len(true_image))
+            ax.stem(
+                x,
+                true_image,
+                linefmt="r-",
+                markerfmt="ro",
+                basefmt="k-",
+                label="True states",
+            )
+            ax.stem(
+                x,
+                pred_image,
+                linefmt="b-",
+                markerfmt="bo",
+                basefmt="k-",
+                label="Predicted States",
+            )
+
+            # Set logarithmic y-scale
+            plt.title("True vs Predicted States")
+            plt.legend()
+            plt.tight_layout()
+            # Render the figure to a canvas
+            canvas = FigureCanvas(fig)
+            canvas.draw()
+            # Convert canvas to a NumPy array
+            image = np.frombuffer(canvas.tostring_rgb(), dtype="uint8")
+            true_image = image.reshape(
+                canvas.get_width_height()[::-1] + (3,)
+            )  # Shape: (height, width, 3)
+            pred_image = None
+            plt.close()
+
+        return true_image, pred_image
 
     def plot_rewards(self, reward_pred, rewards):
         """

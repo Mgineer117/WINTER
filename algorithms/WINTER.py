@@ -76,16 +76,17 @@ class WINTER:
         # param initialization
         self.curr_timesteps = args.SF_epoch * args.step_per_epoch
 
-        images = get_reward_maps(
-            env=env,
-            sf_network=sf_network,
-            V=[reward_options, state_options],
-            feature_dim=args.sf_r_dim + args.sf_s_dim,
-            grid_type=args.grid_type,
-        )
-        self.logger.write_images(
-            step=self.curr_timesteps, images=images, log_dir="RewardMap/Options"
-        )
+        if args.env_name in ("OneRoom", "FourRooms", "Maze", "CtF"):
+            images = get_reward_maps(
+                env=env,
+                sf_network=sf_network,
+                V=[reward_options, state_options],
+                feature_dim=args.sf_r_dim + args.sf_s_dim,
+                grid_type=args.grid_type,
+            )
+            self.logger.write_images(
+                step=self.curr_timesteps, images=images, log_dir="RewardMap/Options"
+            )
 
         # SF checkpoint b/c plotter will only be used
         (
