@@ -578,7 +578,7 @@ def get_args(verbose=True):
     parser.add_argument(
         "--rendering",
         type=bool,
-        default=True,
+        default=False,
         help="saves the rendering during evaluation",
     )
     parser.add_argument(
@@ -590,7 +590,7 @@ def get_args(verbose=True):
     parser.add_argument(
         "--draw-map",
         type=bool,
-        default=True,
+        default=False,
         help="Turn off plotting reward map. Only works for FourRoom",
     )
     parser.add_argument(
