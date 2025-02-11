@@ -356,7 +356,7 @@ def get_args(verbose=True):
     parser.add_argument(
         "--hc-entropy-scaler",
         type=float,
-        default=1e-2,
+        default=3e-3,
         help="Hierarchical policy entropy scaler",
     )
     parser.add_argument(
