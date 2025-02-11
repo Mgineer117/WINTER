@@ -590,7 +590,7 @@ def get_args(verbose=True):
     parser.add_argument(
         "--draw-map",
         type=bool,
-        default=False,
+        default=True,
         help="Turn off plotting reward map. Only works for FourRoom",
     )
     parser.add_argument(

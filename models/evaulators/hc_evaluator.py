@@ -187,8 +187,9 @@ class HC_Evaluator(Evaluator):
                     a, metaData = policy(obs, idx, deterministic=False)
                     a = a.cpu().numpy().squeeze() if a.shape[-1] > 1 else [a.item()]
 
-                self.option_indices["x"].append(self.external_t)
-                self.option_indices["y"].append(metaData["z_argmax"].numpy())
+                if num_episodes == 0 and self.gridPlot:
+                    self.option_indices["x"].append(self.external_t)
+                    self.option_indices["y"].append(metaData["z_argmax"].numpy())
 
                 ### Create an Option Loop
                 if metaData["is_option"]:
