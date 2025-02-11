@@ -276,9 +276,9 @@ def get_args(verbose=True):
     )
     parser.add_argument("--gamma", type=float, default=None, help="discount parameters")
     parser.add_argument(
-        "--max-option-length",
+        "--min-option-length",
         type=int,
-        default=15,
+        default=10,
         help="Minimum time step for one option duration of SNAC / EigenOption",
     )
     parser.add_argument(
@@ -578,7 +578,7 @@ def get_args(verbose=True):
     parser.add_argument(
         "--rendering",
         type=bool,
-        default=False,
+        default=True,
         help="saves the rendering during evaluation",
     )
     parser.add_argument(

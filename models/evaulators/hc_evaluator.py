@@ -92,7 +92,7 @@ class HC_Evaluator(Evaluator):
         dir: str = None,
         gridPlot: bool = True,
         renderPlot: bool = False,
-        max_option_length: int = 3,
+        min_option_length: int = 3,
         gamma: float = 0.99,
         eval_ep_num: int = 10,
         episode_len: int = 100,
@@ -106,7 +106,7 @@ class HC_Evaluator(Evaluator):
         )
         self.plotter = plotter
         self.gamma = gamma
-        self.max_option_length = max_option_length
+        self.min_option_length = min_option_length
         self.episode_len = episode_len
 
         if dir is not None:
@@ -197,7 +197,7 @@ class HC_Evaluator(Evaluator):
                         a, is_option=metaData["is_option"]
                     )
                     if not done:
-                        for o_t in range(1, self.max_option_length):
+                        for o_t in range(1, self.min_option_length):
                             # env stepping
                             with torch.no_grad():
                                 option_a, option_dict = policy(
