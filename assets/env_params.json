@@ -327,7 +327,7 @@
         "reward_loss_scaler": 1.0,
         "state_loss_scaler": 1e-1,
         "weight_loss_scaler": 1e-8,
-        "lasso_loss_scaler": 1e-4,
+        "lasso_loss_scaler": 1e-5,
         "episode_len": 150,
         "warm_batch_size": 8192,
         "sf_batch_size": 512,
