@@ -49,7 +49,7 @@ class FeatureTrain:
             state_dim=args.s_dim,
             action_dim=args.a_dim,
             hc_action_dim=args.num_weights + 1,
-            max_option_length=args.max_option_length,
+            min_option_length=args.min_option_length,
             num_options=1,
             episode_len=args.episode_len,
             batch_size=args.warm_batch_size,
