@@ -104,7 +104,7 @@ class Base:
         else:
             sample_fn = self.collect_trajectory
 
-        queue = multiprocessing.Manager().Queue()
+        queue = multiprocessing.Queue()
         idx_idx = 0
         worker_idx = 0
 
