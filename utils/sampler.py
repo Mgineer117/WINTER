@@ -98,42 +98,45 @@ class Base:
         policy_device = policy.device
         policy.to_device(torch.device("cpu"))
 
-        # select appropriate sampler function
-        if is_option:
-            sample_fn = self.collect_trajectory4Option
-        else:
-            sample_fn = self.collect_trajectory
+        # Select appropriate sampler function
+        sample_fn = self.collect_trajectory4Option if is_option else self.collect_trajectory
 
-        queue = multiprocessing.Queue()
         idx_idx = 0
         worker_idx = 0
 
-        # iterate over rounds
+        # Use persistent queue from self.manager
+        if not hasattr(self, "manager"):
+            self.manager = multiprocessing.Manager()
+            self.queue = self.manager.Queue()
+
+        queue = self.queue
+
+        # Iterate over rounds
         for round_number in range(self.rounds):
             processes = []
-            if round_number == self.rounds - 1:
-                indices = option_indices[idx_idx:]
-            else:
-                indices = option_indices[
-                    idx_idx : idx_idx + self.num_idx_per_round[round_number]
-                ]
-            # iterate over indices
+            indices = option_indices[idx_idx:] if round_number == self.rounds - 1 else \
+                    option_indices[idx_idx : idx_idx + self.num_idx_per_round[round_number]]
+
+            # Iterate over indices
             for idx in indices:
                 for i in range(self.num_worker_per_idx):
-                    # print(f"total num worker {self.total_num_worker}")
                     if worker_idx == self.total_num_worker - 1:
                         # Main thread process
-                        memory = sample_fn(
-                            worker_idx,
-                            None,
-                            self.env,
-                            policy,
-                            idx,
-                            grid_type,
-                            random_init_pos,
-                            seed=i,
-                            deterministic=deterministic,
-                        )
+                        try:
+                            memory = sample_fn(
+                                worker_idx,
+                                None,
+                                self.env,
+                                policy,
+                                idx,
+                                grid_type,
+                                random_init_pos,
+                                seed=i,
+                                deterministic=deterministic,
+                            )
+                        except Exception as e:
+                            print(f"Main thread worker {worker_idx} failed: {e}")
+                            memory = None
                     else:
                         # Sub-thread process
                         worker_args = (
@@ -150,57 +153,62 @@ class Base:
                         p = multiprocessing.Process(target=sample_fn, args=worker_args)
                         processes.append(p)
                         p.start()
+
                     worker_idx += 1
+
                 if worker_idx % self.req_num_workers == 0:
                     idx_idx += 1
+
+            # Ensure all workers finish before collecting data
             for p in processes:
                 p.join()
 
-        # include worker memories in one list
+        # Include worker memories in one list
         worker_memories = [None] * worker_idx
-        for _ in range(worker_idx - 1):
-            pid, worker_memory = queue.get()
-            worker_memories[pid] = worker_memory
-        worker_memories[-1] = memory
+        while not queue.empty():
+            try:
+                pid, worker_memory = queue.get(timeout=2)
+                worker_memories[pid] = worker_memory
+            except Exception as e:
+                print(f"Queue retrieval error: {e}")
 
-        # classify the batch according to the option index
+        worker_memories[-1] = memory  # Add main thread memory
+
+        # Classify the batch according to the option index
         if self.num_options == 1:
-            ### for option == 1 or non-option based sapling
-            ### we return the batch = {args: value}
             memory = {}
-            for worker_memory in worker_memories:  # concat in order
+            for worker_memory in worker_memories:
+                if worker_memory is None:
+                    continue
                 for key in worker_memory:
                     if key in memory:
-                        memory[key] = np.concatenate(
-                            (memory[key], worker_memory[key]), axis=0
-                        )
+                        memory[key] = np.concatenate((memory[key], worker_memory[key]), axis=0)
                     else:
                         memory[key] = worker_memory[key]
 
-            # concat to the desired batch size
+            # Truncate to batch size
             for k, v in memory.items():
                 memory[k] = v[: self.batch_size]
+
         else:
-            ### for option == n
-            ### we return the batch = {idx: {args: value}}
             memory_dict = {i: [] for i in range(len(option_indices))}
             for i, worker_memory in enumerate(worker_memories):
+                if worker_memory is None:
+                    continue
                 option_index = i // self.num_worker_per_idx
                 memory_dict[option_index].append(worker_memory)
 
             memory = {}
-            # iterate over option idx
             for i, batch_list in memory_dict.items():
                 stacked_dict = {}
                 for batch in batch_list:
                     for key, value in batch.items():
                         if key in stacked_dict:
-                            stacked_dict[key] = np.concatenate(
-                                (stacked_dict[key], value), axis=0
-                            )
+                            stacked_dict[key] = np.concatenate((stacked_dict[key], value), axis=0)
                         else:
                             stacked_dict[key] = value
-                # cut to the desired size
+
+                # Truncate to batch size
                 for k, v in stacked_dict.items():
                     stacked_dict[k] = v[: self.batch_size]
                 memory[i] = stacked_dict
