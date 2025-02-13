@@ -1,0 +1,4 @@
+nohup python3 main.py --env-name PointNavigation --project Sgym --algo-name WINTER --method cvs --gpu-idx 0 --cpu-preserve-rate 0.3 &
+nohup python3 main.py --env-name PointNavigation --project Sgym --algo-name WINTER --method crs --gpu-idx 0 --cpu-preserve-rate 0.3 &
+nohup python3 main.py --env-name PointNavigation --project Sgym --algo-name WINTER --method trs --gpu-idx 1 --cpu-preserve-rate 0.3 &
+nohup python3 main.py --env-name PointNavigation --project Sgym --algo-name PPO --gpu-idx 1 --cpu-preserve-rate 0.3 &
