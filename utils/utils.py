@@ -322,7 +322,7 @@ def save_dim_to_args(env, args):
     env.close()
 
 
-def setup_logger(args, unique_id, seed):
+def setup_logger(args, unique_id, exp_time, seed):
     """
     setup logger both using WandB and Tensorboard
     Return: WandB logger, Tensorboard logger
@@ -331,11 +331,8 @@ def setup_logger(args, unique_id, seed):
     now = datetime.now()
     args.running_seed = seed
 
-    # Format the date as "month_day_year"
-    formatted_date = now.strftime("%m_%d")
-
     if args.group is None:
-        args.group = "-".join((formatted_date, unique_id))
+        args.group = "-".join((exp_time, unique_id))
 
     if args.name is None:
         args.name = "-".join(
@@ -344,17 +341,18 @@ def setup_logger(args, unique_id, seed):
 
     if args.project is None:
         args.project = args.env_name
+
     args.logdir = os.path.join(args.logdir, args.group)
 
     default_cfg = vars(args)
     logger = WandbLogger(
-        default_cfg,
-        args.project,
-        args.group,
-        args.name,
-        args.logdir,
-        True,
-        args.render_fps,
+        config=default_cfg,
+        project=args.project,
+        group=args.group,
+        name=args.name,
+        log_dir=args.logdir,
+        log_txt=True,
+        fps=args.render_fps,
     )
     logger.save_config(default_cfg, verbose=args.verbose)
 

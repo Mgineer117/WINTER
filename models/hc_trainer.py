@@ -73,15 +73,13 @@ class HCTrainer:
 
                 elapsed_time = time.time() - start_time
                 avg_time_per_iter = elapsed_time / pbar.n
-                remaining_time = avg_time_per_iter * (
-                     self.timesteps - pbar.n
-                )
+                remaining_time = avg_time_per_iter * (self.timesteps - pbar.n)
 
                 # Update environment steps and calculate time metrics
-                loss_dict["HC/timesteps"] = pbar.n
-                loss_dict["HC/sample_time"] = sample_time
-                loss_dict["HC/update_time"] = update_time
-                loss_dict["HC/remaining_time (hr)"] = (
+                loss_dict["HC/analytics/timesteps"] = pbar.n
+                loss_dict["HC/analytics/sample_time"] = sample_time
+                loss_dict["HC/analytics/update_time"] = update_time
+                loss_dict["HC/analytics/remaining_time (hr)"] = (
                     remaining_time / 3600
                 )  # Convert to hours
 
@@ -92,7 +90,7 @@ class HCTrainer:
 
                 ### Eval Loop
                 if pbar.n >= self.eval_interval * (self.eval_num + 1):
-                    
+
                     self.policy.eval()
                     self.eval_num += 1
 
@@ -108,6 +106,7 @@ class HCTrainer:
                     self.write_log(
                         eval_dict,
                         step=int(pbar.n + self.init_timesteps),
+                        eval_log=True,
                     )
                     self.write_image(
                         supp_dict,
@@ -129,10 +128,10 @@ class HCTrainer:
             f"total HC training time: {((time.time() - start_time) / 3600):.2f} hours"
         )
 
-    def write_log(self, logging_dict: dict, step: int):
+    def write_log(self, logging_dict: dict, step: int, eval_log: bool = False):
         # Logging to WandB and Tensorboard
         self.logger.store(**logging_dict)
-        self.logger.write(step, display=False)
+        self.logger.write(step, eval_log=eval_log, display=False)
         for key, value in logging_dict.items():
             self.writer.add_scalar(key, value, step)
 
@@ -167,9 +166,7 @@ class HCTrainer:
             np.mean(self.last_reward_mean) > self.last_max_reward
             and np.mean(self.last_reward_std) <= self.std_limit
         ):
-            self.policy.save_model(
-                self.logger.log_dirs[2], e, name="HC", is_best=True
-            )
+            self.policy.save_model(self.logger.log_dirs[2], e, name="HC", is_best=True)
             self.last_max_reward = np.mean(self.last_reward_mean)
 
     def average_dict_values(self, dict_list):

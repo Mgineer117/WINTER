@@ -33,12 +33,12 @@ class WandbLogger(BaseLogger):
     def __init__(
         self,
         config: dict = {},
-        project: str = "popodice",
+        project: str = "project",
         group: str = "test",
         name: str = None,
         log_dir: str = "log",
         log_txt: bool = True,
-        fps: int = 10
+        fps: int = 10,
     ) -> None:
         super().__init__(log_dir, log_txt, name)
         self.fps = fps

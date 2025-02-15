@@ -230,10 +230,10 @@ class OPTrainer:
 
                 # Logging further info
                 loss = self.average_dict_values(policy_loss)
-                loss["OP_PPO/timesteps"] = pbar.n
-                loss["OP_PPO/sample_time"] = sample_time
-                loss["OP_PPO/update_time"] = update_time
-                loss["OP_PPO/remaining_time (hr)"] = (
+                loss["OP_PPO/analytics/timesteps"] = pbar.n
+                loss["OP_PPO/analytics/sample_time"] = sample_time
+                loss["OP_PPO/analytics/update_time"] = update_time
+                loss["OP_PPO/analytics/remaining_time (hr)"] = (
                     remaining_time / 3600
                 )  # Convert to hours
 

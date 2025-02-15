@@ -444,16 +444,16 @@ class OP_Controller(BasePolicy):
 
         # Logging
         loss_dict = {
-            "OP_PPO/loss": np.mean(losses),
-            "OP_PPO/actor_loss": np.mean(actor_losses),
-            "OP_PPO/value_loss": np.mean(value_losses),
-            "OP_PPO/entropy_loss": np.mean(entropy_losses),
-            "OP_PPO/clip_fraction": np.mean(clip_fractions),
-            "OP_PPO/klDivergence": target_kl[-1],
-            f"OP_PPO/avg_rewards{z}": (
+            "OP_PPO/loss/total_loss": np.mean(losses),
+            "OP_PPO/loss/actor_loss": np.mean(actor_losses),
+            "OP_PPO/loss/value_loss": np.mean(value_losses),
+            "OP_PPO/loss/entropy_loss": np.mean(entropy_losses),
+            "OP_PPO/analytics/clip_fraction": np.mean(clip_fractions),
+            "OP_PPO/analytics/klDivergence": target_kl[-1],
+            "OP_PPO/analytics/K-epoch": k + 1,
+            f"OP_PPO/measure/avg_rewards{z}": (
                 torch.sum(rewards) / torch.sum(terminals)
             ).item(),
-            "OP_PPO/K-epoch": k + 1,
         }
         grad_dict = self.average_dict_values(grad_dicts)
         norm_dict = self.compute_weight_norm(

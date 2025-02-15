@@ -325,14 +325,16 @@ class HC_Controller(BasePolicy):
 
         # Logging
         loss_dict = {
-            "HC/loss": np.mean(losses),
-            "HC/actor_loss": np.mean(actor_losses),
-            "HC/value_loss": np.mean(value_losses),
-            "HC/entropy_loss": np.mean(entropy_losses),
-            "HC/clip_fraction": np.mean(clip_fractions),
-            "HC/klDivergence": target_kl[-1],
-            "HC/avg_rewards": (torch.sum(rewards) / torch.sum(terminals)).item(),
-            "HC/K-epoch": k + 1,
+            "HC/loss/loss": np.mean(losses),
+            "HC/loss/actor_loss": np.mean(actor_losses),
+            "HC/loss/value_loss": np.mean(value_losses),
+            "HC/loss/entropy_loss": np.mean(entropy_losses),
+            "HC/analytics/clip_fraction": np.mean(clip_fractions),
+            "HC/analytics/klDivergence": target_kl[-1],
+            "HC/analytics/K-epoch": k + 1,
+            "HC/measure/avg_rewards": (
+                torch.sum(rewards) / torch.sum(terminals)
+            ).item(),
         }
         grad_dict = self.average_dict_values(grad_dicts)
         norm_dict = self.compute_weight_norm(

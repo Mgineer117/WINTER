@@ -72,10 +72,10 @@ class PPOTrainer:
                 remaining_time = avg_time_per_iter * (self.timesteps - pbar.n)
 
                 # Update environment steps and calculate time metrics
-                loss_dict["PPO/timesteps"] = pbar.n
-                loss_dict["PPO/sample_time"] = sample_time
-                loss_dict["PPO/update_time"] = update_time
-                loss_dict["PPO/remaining_time (hr)"] = (
+                loss_dict["PPO/analytics/timesteps"] = pbar.n
+                loss_dict["PPO/analytics/sample_time"] = sample_time
+                loss_dict["PPO/analytics/update_time"] = update_time
+                loss_dict["PPO/analytics/remaining_time (hr)"] = (
                     remaining_time / 3600
                 )  # Convert to hours
 
@@ -99,10 +99,7 @@ class PPOTrainer:
                         eval_dict["PPO/" + k] = temp_eval_dict[k]
 
                     # Manual logging
-                    self.write_log(
-                        eval_dict,
-                        step=pbar.n,
-                    )
+                    self.write_log(eval_dict, step=pbar.n, eval_log=True)
                     self.write_image(
                         supp_dict,
                         step=pbar.n,
@@ -131,10 +128,10 @@ class PPOTrainer:
         # will be implemented
         pass
 
-    def write_log(self, logging_dict: dict, step: int):
+    def write_log(self, logging_dict: dict, step: int, eval_log: bool = False):
         # Logging to WandB and Tensorboard
         self.logger.store(**logging_dict)
-        self.logger.write(step, display=False)
+        self.logger.write(step, eval_log=eval_log, display=False)
         for key, value in logging_dict.items():
             self.writer.add_scalar(key, value, step)
 

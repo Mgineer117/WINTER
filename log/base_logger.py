@@ -30,7 +30,8 @@ class BaseLogger(ABC):
     def __init__(self, log_dir="log", log_txt=True, name=None) -> None:
         super().__init__()
         self.name = name if name is not None else time.strftime("%m-%d_exp")
-        self.log_dir = osp.join(log_dir, name) if log_dir is not None else None
+        self.base_logdir = log_dir
+        self.log_dir = osp.join(self.base_logdir, name) if log_dir is not None else None
 
         folder_names = [
             "SF",
@@ -49,7 +50,7 @@ class BaseLogger(ABC):
         for log_dir in self.log_dirs:
             self.checkpoint_dirs.append(os.path.join(log_dir, "checkpoint"))
 
-        self.log_fname = "output.csv"
+        self.log_fname = f"{name}.csv"
 
         if self.log_dir:
             if osp.exists(self.log_dir):
@@ -66,7 +67,7 @@ class BaseLogger(ABC):
                     os.makedirs(ckpt_dir)
 
             if log_txt:
-                self.csv_file = os.path.join(log_dir, self.log_fname)
+                self.csv_file = os.path.join(self.base_logdir, self.log_fname)
         else:
             self.output_file = None
         self.first_row = True
@@ -132,8 +133,6 @@ class BaseLogger(ABC):
                 writer = csv.writer(file)
                 writer.writerow(map(str, vals))  # Adding headers
 
-            # self.output_file.write("\t".join(map(str, vals)) + "\n")
-            # self.output_file.flush()
             self.first_row = False
         if display:
             self.display_tabular(display_keys=display_keys)

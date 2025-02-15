@@ -200,14 +200,16 @@ class PPO_Learner(BasePolicy):
 
         # Logging
         loss_dict = {
-            "PPO/loss": np.mean(losses),
-            "PPO/actor_loss": np.mean(actor_losses),
-            "PPO/value_loss": np.mean(value_losses),
-            "PPO/entropy_loss": np.mean(entropy_losses),
-            "PPO/clip_fraction": np.mean(clip_fractions),
-            "PPO/klDivergence": target_kl[-1],
-            "PPO/avg_rewards": (torch.sum(rewards) / torch.sum(terminals)).item(),
-            "PPO/K-epoch": k + 1,
+            "PPO/loss/loss": np.mean(losses),
+            "PPO/loss/actor_loss": np.mean(actor_losses),
+            "PPO/loss/value_loss": np.mean(value_losses),
+            "PPO/loss/entropy_loss": np.mean(entropy_losses),
+            "PPO/analytics/clip_fraction": np.mean(clip_fractions),
+            "PPO/analytics/klDivergence": target_kl[-1],
+            "PPO/analytics/K-epoch": k + 1,
+            "PPO/measure/avg_rewards": (
+                torch.sum(rewards) / torch.sum(terminals)
+            ).item(),
         }
         grad_dict = self.average_dict_values(grad_dicts)
         norm_dict = self.compute_weight_norm(
