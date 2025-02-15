@@ -1,13 +1,13 @@
-from algorithms.WINTER import WINTER
+from algorithms.FeatureTrain import SF_Train
+from algorithms.SNAC import SNAC
 from algorithms.PPO import PPO
 from algorithms.SAC import SAC
 from algorithms.OptionCritic import OptionCritic
-from algorithms.FeatureTrain import FeatureTrain
 
 __all__ = [
-    "WINTER",
+    "SNAC",
     "PPO",
     "SAC",
     "OptionCritic",
-    "FeatureTrain",
+    "SF_Train",
 ]

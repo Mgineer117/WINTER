@@ -3,11 +3,12 @@ import gymnasium as gym
 
 from safety_gymnasium import __register_helper
 from gym_multigrid.envs.oneroom import OneRoom
+from gym_multigrid.envs.fourrooms import FourRooms
 from gym_multigrid.envs.maze import Maze
 from gym_multigrid.envs.lavarooms import LavaRooms
 from gym_multigrid.envs.ctf import CtF
 
-
+from utils.utils import save_dim_to_args
 from utils.wrappers import GridWrapper, CtFWrapper, NavigationWrapper, GymWrapper
 
 
@@ -35,6 +36,21 @@ def call_env(args):
             render_mode="rgb_array",
         )
         disc_or_cont(env, args)
+        save_dim_to_args(env, args)
+        args.agent_num = len(env.agents)
+        return GridWrapper(env, args)
+    elif args.env_name == "FourRooms":
+        # first call dummy env to find possible location for agent
+        env = FourRooms(
+            grid_type=args.grid_type,
+            max_steps=args.episode_len,
+            tile_size=args.img_tile_size,
+            highlight_visible_cells=False,
+            partial_observability=False,
+            render_mode="rgb_array",
+        )
+        disc_or_cont(env, args)
+        save_dim_to_args(env, args)
         args.agent_num = len(env.agents)
         return GridWrapper(env, args)
     elif args.env_name == "LavaRooms":
@@ -48,6 +64,21 @@ def call_env(args):
             render_mode="rgb_array",
         )
         disc_or_cont(env, args)
+        save_dim_to_args(env, args)
+        args.agent_num = len(env.agents)
+        return GridWrapper(env, args)
+    elif args.env_name == "Maze":
+        # first call dummy env to find possible location for agent
+        env = Maze(
+            grid_type=args.grid_type,
+            max_steps=args.episode_len,
+            tile_size=args.img_tile_size,
+            highlight_visible_cells=False,
+            partial_observability=False,
+            render_mode="rgb_array",
+        )
+        disc_or_cont(env, args)
+        save_dim_to_args(env, args)
         args.agent_num = len(env.agents)
         return GridWrapper(env, args)
     elif args.env_name in ("CtF"):
@@ -70,6 +101,7 @@ def call_env(args):
             step_penalty_ratio=0.0,
         )
         disc_or_cont(env, args)
+        save_dim_to_args(env, args)
         args.agent_num = len(env.agents)
         return CtFWrapper(env, args)
     elif args.env_name == "PointNavigation":
@@ -92,6 +124,7 @@ def call_env(args):
         )
 
         disc_or_cont(env, args)
+        save_dim_to_args(env, args)
         args.agent_num = 1
         return NavigationWrapper(env, args)
     elif args.env_name == "InvertedPendulum":
@@ -100,6 +133,7 @@ def call_env(args):
             render_mode="rgb_array",
         )
         disc_or_cont(env, args)
+        save_dim_to_args(env, args)
         args.agent_num = 1
         return GymWrapper(env, args)
     elif args.env_name == "Hopper":
@@ -108,6 +142,7 @@ def call_env(args):
             render_mode="rgb_array",
         )
         disc_or_cont(env, args)
+        save_dim_to_args(env, args)
         args.agent_num = 1
         return GymWrapper(env, args)
     else:

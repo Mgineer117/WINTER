@@ -100,8 +100,8 @@ def get_args(verbose=True):
     parser.add_argument(
         "--algo-name",
         type=str,
-        default="WINTER",
-        help="WINTER / OptionCritic / SAC / PPO",
+        default="SNAC",
+        help="SNAC / OptionCritic / SAC / PPO",
     )
     parser.add_argument(
         "--grid-type",
@@ -438,25 +438,25 @@ def get_args(verbose=True):
         help="This is general fully connected dimension for most of network this code.",
     )
     parser.add_argument(
-        "--sf-r-dim",
+        "--snac-split-ratio",
+        type=float,
+        default=0.25,
+        help="This is general fully connected dimension for most of network this code.",
+    )
+    parser.add_argument(
+        "--temporal-balance-ratio",
+        type=float,
+        default=0.25,
+        help="This is general fully connected dimension for most of network this code.",
+    )
+    parser.add_argument(
+        "--num-options",
         type=int,
         default=None,
         help="This is general fully connected dimension for most of network this code.",
     )
     parser.add_argument(
-        "--r-option-num",
-        type=int,
-        default=None,
-        help="This is general fully connected dimension for most of network this code.",
-    )
-    parser.add_argument(
-        "--sf-s-dim",
-        type=int,
-        default=None,
-        help="This is general fully connected dimension for most of network this code.",
-    )
-    parser.add_argument(
-        "--s-option-num",
+        "--sf-dim",
         type=int,
         default=None,
         help="This is general fully connected dimension for most of network this code.",

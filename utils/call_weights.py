@@ -1,5 +1,5 @@
 import numpy as np
-from math import ceil
+from math import ceil, floor
 import torch
 import torch.nn as nn
 import gymnasium as gym
@@ -7,7 +7,7 @@ import random
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from models.policy import LASSO
+from models.policy import SF_LASSO
 from sklearn.cluster import KMeans
 
 from utils.buffer import TrajectoryBuffer
@@ -15,58 +15,13 @@ from utils.sampler import OnlineSampler
 from utils.utils import estimate_psi
 
 
-def create_matrix(n):
-    # Initialize an empty list to hold the rows
-    matrix = []
-
-    # Dynamically generate the vectors
-    for i in range(n):
-        vector_positive = [0.0] * n
-        vector_negative = [0.0] * n
-
-        # Set the current index to +1.0 and -1.0 for positive and negative vectors
-        vector_positive[i] = 1.0
-        vector_negative[i] = -1.0
-
-        # Add the vectors to the matrix
-        matrix.append(vector_positive)
-        matrix.append(vector_negative)
-
-    # Convert the matrix to a NumPy array
-    return np.array(matrix)
-
-
-def call_feature_weights(sf_r_dim: int):
-    """Create a feature weights for sf_r_dim and sf_s_dim
-
-    Args:
-        sf_r_dim (_type_): _description_
-        sf_s_dim (_type_): _description_
-    """
-
-    if sf_r_dim == 3:
-        reward_feature_weights = np.array([1.0, 0.0, -1.0])
-    elif sf_r_dim == 5:
-        reward_feature_weights = np.array([1.0, 0.5, 0.0, -0.5, -1.0])
-        # reward_feature_weights = np.array([1.0, 1.0, 0.0, -1.0, -1.0])
-    elif sf_r_dim == 7:
-        reward_feature_weights = np.array([1.0, 0.66, 0.33, 0.0, -0.33, -0.66, -1.0])
-    elif sf_r_dim == 10:
-        reward_feature_weights = np.array(
-            [1.0, 0.25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, -1.0]
-        )
-    else:
-        raise ValueError(f"sf_r_dim (given: {sf_r_dim}) is not one of [3, 5, 7] ")
-
-    return reward_feature_weights  # , reward_options, state_options
-
-
 def call_options(
-    sf_r_dim: int,
-    r_option_num: int,
-    sf_s_dim: int,
-    s_option_num: int,
-    sf_network: LASSO,
+    algo_name: str,
+    sf_dim: int,
+    snac_split_ratio: float,
+    temporal_balance_ratio: float,
+    num_options: int,
+    sf_network: SF_LASSO,
     sampler: OnlineSampler,
     buffer: TrajectoryBuffer,
     grid_type: int,
@@ -74,80 +29,110 @@ def call_options(
     method: str = "top",
     device: torch.device = torch.device("cpu"),
 ):
-    ### create a option vector
-    reward_options = create_matrix(sf_r_dim)[: 2 * r_option_num]
-    # reward_options = np.array(
-    #     [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-    #     [-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-    #     [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-    #     [0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-    #     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-    #     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0],
-    #     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-    #     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0],
-    # )
+    # required params
+    if algo_name == "SNAC":
+        num_r_features = floor(sf_dim * snac_split_ratio)
+        num_s_features = sf_dim - num_r_features
+        # collecting num // 2 for each of reward and state features
+        num_options = num_options // 2
+    else:
+        num_r_features = 0
+        num_s_features = sf_dim
 
-    if sf_s_dim != 0:
-        # Warm buffer
-        buffer.max_batch_size = int(3e4)
-        buffer = warm_buffer(sf_network, sampler, buffer, grid_type)
-        samples = buffer.sample_all()
+    # Warm buffer
+    buffer.max_batch_size = int(3e4)
+    buffer = warm_buffer(sf_network, sampler, buffer, grid_type)
+    samples = buffer.sample_all()
 
-        states = torch.from_numpy(samples["states"]).to(device)
-        terminals = samples["terminals"]
+    # collect samples
+    states = torch.from_numpy(samples["states"]).to(device)
+    terminals = samples["terminals"]
 
-        with torch.no_grad():
-            features = sf_network.get_features(
-                states, deterministic=True, to_numpy=True
-            )
-        _, features = sf_network.split(features, sf_network.sf_r_dim)
-        psi = estimate_psi(features, terminals=terminals, gamma=gamma)
+    # get features (phi and psi)
+    with torch.no_grad():
+        features = sf_network.get_features(states, deterministic=True, to_numpy=True)
+    _, features = sf_network.split(features, sf_network.sf_r_dim)
+    psi = estimate_psi(features, terminals=terminals, gamma=gamma)
 
-        _, S, V = np.linalg.svd(psi)
+    # prepare for subtask discovery
+    if num_r_features > 0:
+        phi_R, phi_S = psi[:, :num_r_features], psi[:, num_r_features:]
+        psi_R, psi_S = psi[:, :num_r_features], psi[:, num_r_features:]
 
-        if method == "top":
-            V = V[:s_option_num]
-        elif method == "cvs":
-            # Use K-Means++ to cluster V (rows)
-            kmeans = KMeans(n_clusters=s_option_num, init="k-means++", random_state=42)
-            kmeans.fit(V)
-            centroids = kmeans.cluster_centers_
+        _, S_R, V_R = np.linalg.svd(psi_R)
+        _, S_S, V_S = np.linalg.svd(psi_S)
+        subtask_vectors = {"rewards": V_R, "states": V_S}
+    else:
+        phi_S = features
+        _, S_S, V_S = np.linalg.svd(psi)
+        subtask_vectors = {"rewards": None, "states": V_S}
 
-            V = centroids[:s_option_num]
-        elif method == "crs":
-            # Use K-Means++ to cluster V.T (columns/features)
-            kmeans = KMeans(n_clusters=s_option_num, init="k-means++", random_state=42)
-            kmeans.fit(V @ features.T)
-            cluster_labels = kmeans.labels_
+    reward_options, state_options = [], []
+    for key, subtask_vector in subtask_vectors.items():
+        if key == "rewards":
+            if subtask_vector is not None:
+                V = subtask_vector[:num_options]
+            else:
+                V = None
+        else:
+            if method == "top":
+                V = subtask_vector[:num_options]
+            elif method == "cvs":
+                # Use K-Means++ to cluster V (rows)
+                kmeans = KMeans(
+                    n_clusters=num_options, init="k-means++", random_state=42
+                )
+                kmeans.fit(subtask_vector)
+                centroids = kmeans.cluster_centers_
 
-            crs_V = np.empty((s_option_num, V.shape[-1]))
-            for i in range(s_option_num):
-                crs_V[i] = np.mean(V[cluster_labels == i], axis=0)
+                V = centroids[:num_options]
+            elif method == "crs":
+                # Use K-Means++ to cluster V.T (columns/features)
+                kmeans = KMeans(
+                    n_clusters=num_options, init="k-means++", random_state=42
+                )
+                kmeans.fit(subtask_vector @ phi_S.T)
+                cluster_labels = kmeans.labels_
 
-            V = crs_V
+                crs_V = np.empty((num_options, subtask_vector.shape[-1]))
+                for i in range(num_options):
+                    crs_V[i] = np.mean(subtask_vector[cluster_labels == i], axis=0)
 
-        elif method == "trs":
-            n = ceil(0.25 * s_option_num)  # Calculate 25% of s_option_num
-            top_n_V = V[:n]
-            remainder_V = V[n:]
-            pseudo_rewards = remainder_V @ features.T
+                V = crs_V
 
-            kmeans = KMeans(
-                n_clusters=s_option_num - n, init="k-means++", random_state=42
-            )
-            kmeans.fit(pseudo_rewards)
-            cluster_labels = kmeans.labels_
+            elif method == "trs":
+                # Collect n% of top n and remainder CRS clustered
+                n = ceil(temporal_balance_ratio * num_options)
+                top_n_V = subtask_vector[:n]
+                remainder_V = subtask_vector[n:]
+                pseudo_rewards = remainder_V @ phi_S.T
 
-            crs_V = np.empty((s_option_num - n, remainder_V.shape[-1]))
-            for i in range(s_option_num - n):
-                crs_V[i] = np.mean(remainder_V[cluster_labels == i], axis=0)
+                kmeans = KMeans(
+                    n_clusters=num_options - n, init="k-means++", random_state=42
+                )
+                kmeans.fit(pseudo_rewards)
+                cluster_labels = kmeans.labels_
 
-            V = np.concatenate((top_n_V, crs_V), axis=0)
+                crs_V = np.empty((num_options - n, remainder_V.shape[-1]))
+                for i in range(num_options - n):
+                    crs_V[i] = np.mean(remainder_V[cluster_labels == i], axis=0)
+
+                V = np.concatenate((top_n_V, crs_V), axis=0)
+            else:
+                raise ValueError(f"method {method} not recognized")
 
         # Include both the original and negative counterparts
-        state_options = np.concatenate((V, -V), axis=0)
-    else:
-        state_options = None
+        if V is not None:
+            if key == "rewards":
+                reward_options.append(np.concatenate((V, -V), axis=0))
+            else:
+                state_options.append(np.concatenate((V, -V), axis=0))
+        else:
+            if key == "rewards":
+                reward_options.append(None)
+            else:
+                # shouldn't be None
+                state_options.append(None)
 
     return reward_options, state_options
 
@@ -391,9 +376,7 @@ def warm_buffer(
     total_sample_time = 0
     sample_time = 0
     while buffer.num_samples < buffer.max_batch_size:
-        batch, sampleT = sampler.collect_samples(
-            sf_network, grid_type=grid_type
-        )
+        batch, sampleT = sampler.collect_samples(sf_network, grid_type=grid_type)
         buffer.push(batch)
         sample_time += sampleT
         total_sample_time += sampleT

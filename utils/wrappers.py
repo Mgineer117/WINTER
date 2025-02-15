@@ -1,13 +1,11 @@
 import numpy as np
 from numpy.typing import NDArray
 import gymnasium as gym
-from utils.utils import save_dim_to_args
 
 
 class GridWrapper(gym.Wrapper):
     def __init__(self, env: gym.Env, args):
         super(GridWrapper, self).__init__(env)
-        save_dim_to_args(env, args)  # given env, save its state and action dim
         self.agent_num = args.agent_num
 
     def get_agent_pos(self):
@@ -45,7 +43,6 @@ class GridWrapper(gym.Wrapper):
 class CtFWrapper(gym.Wrapper):
     def __init__(self, env: gym.Env, args):
         super(CtFWrapper, self).__init__(env)
-        save_dim_to_args(env, args)  # given env, save its state and action dim
         self.agent_num = args.agent_num
 
     def get_agent_pos(self):
@@ -83,7 +80,6 @@ class CtFWrapper(gym.Wrapper):
 class NavigationWrapper(gym.Wrapper):
     def __init__(self, env: gym.Env, args: float = 1e-1):
         super(NavigationWrapper, self).__init__(env)
-        save_dim_to_args(env, args)  # given env, save its state and action dim
         self.cost_scaler = args.cost_scaler
 
     def get_agent_pos(self):
@@ -113,7 +109,6 @@ class NavigationWrapper(gym.Wrapper):
 class GymWrapper(gym.Wrapper):
     def __init__(self, env: gym.Env, args):
         super(GymWrapper, self).__init__(env)
-        save_dim_to_args(env, args)  # given env, save its state and action dim
 
     def reset(self, **kwargs):
         observation, _ = self.env.reset(**kwargs)

@@ -314,11 +314,9 @@ def call_ocNetwork(args):
     return policy
 
 
-def call_sfNetwork(
-    args, reward_feature_weights: np.ndarray, sf_path: str | None = None
-):
+def call_sfNetwork(args, sf_path: str | None = None):
     from models.layers.sf_networks import AutoEncoder, VAE, ConvNetwork
-    from models.policy import LASSO
+    from models.policy import SF_LASSO, SF_SNAC, SF_EigenOption
 
     if args.import_sf_model:
         print("Loading previous SF parameters....")
@@ -326,6 +324,7 @@ def call_sfNetwork(
             open(f"log/eval_log/model_for_eval/{args.env_name}/sf_network.p", "rb")
         )
     else:
+        reward_feature_weights = None
         if args.env_name in ("PointNavigation"):
             msg = colorize(
                 "\nVAE Feature Extractor is selected!!!",
@@ -337,8 +336,8 @@ def call_sfNetwork(
                 state_dim=args.s_dim,
                 action_dim=args.a_dim,
                 fc_dim=args.sf_fc_dim,
-                sf_r_dim=args.sf_r_dim,
-                sf_s_dim=args.sf_s_dim,
+                sf_dim=args.sf_dim,
+                snac_split_ratio=args.snac_split_ratio,
                 activation=nn.ELU(),
             )
         else:
@@ -356,18 +355,22 @@ def call_sfNetwork(
                 encoder_conv_layers=encoder_conv_layers,
                 decoder_conv_layers=decoder_conv_layers,
                 fc_dim=args.sf_fc_dim,
-                sf_r_dim=args.sf_r_dim,
-                sf_s_dim=args.sf_s_dim,
+                sf_dim=args.sf_dim,
+                snac_split_ratio=args.snac_split_ratio,
                 activation=nn.Tanh(),
             )
 
-    sf_network = LASSO(
+    algo_classes = {"SNAC": SF_SNAC, "EigenOption": SF_EigenOption, "default": SF_LASSO}
+
+    sf_network_class = algo_classes.get(args.algo_name, SF_LASSO)
+
+    sf_network = sf_network_class(
         env_name=args.env_name,
         feaNet=feaNet,
         feature_weights=reward_feature_weights,
         a_dim=args.a_dim,
-        sf_r_dim=args.sf_r_dim,
-        sf_s_dim=args.sf_s_dim,
+        sf_dim=args.sf_dim,
+        snac_split_ratio=args.snac_split_ratio,
         sf_lr=args.sf_lr,
         batch_size=args.sf_batch_size,
         reward_loss_scaler=args.reward_loss_scaler,

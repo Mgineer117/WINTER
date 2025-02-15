@@ -1,4 +1,5 @@
 import numpy as np
+from math import floor
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -70,8 +71,8 @@ class ConvNetwork(nn.Module):
         self,
         state_dim: tuple,
         action_dim: int,
-        sf_r_dim: int,
-        sf_s_dim: int,
+        sf_dim: int,
+        snac_split_ratio: int,
         encoder_conv_layers: list,
         decoder_conv_layers: list,
         fc_dim: int = 256,
@@ -81,8 +82,8 @@ class ConvNetwork(nn.Module):
 
         s_dim, _, in_channels = state_dim
 
-        self.sf_r_dim = sf_r_dim
-        self.sf_s_dim = sf_s_dim
+        self.sf_r_dim = floor(sf_dim * snac_split_ratio)
+        self.sf_s_dim = sf_dim - self.sf_r_dim
 
         # Activation functions
         self.act = activation
@@ -137,7 +138,7 @@ class ConvNetwork(nn.Module):
         self.encoder = MLP(
             input_dim=feature_input_dim,  # agent pos concat
             hidden_dims=(fc_dim, fc_dim),
-            output_dim=sf_r_dim + sf_s_dim,
+            output_dim=self.sf_r_dim + self.sf_s_dim,
             activation=self.act,
         )
 
@@ -150,7 +151,7 @@ class ConvNetwork(nn.Module):
         )
 
         self.de_feature = MLP(
-            input_dim=sf_s_dim,
+            input_dim=self.sf_s_dim,
             hidden_dims=(fc_dim,),
             activation=self.act,
         )
@@ -275,8 +276,8 @@ class AutoEncoder(nn.Module):
         self,
         state_dim: tuple,
         action_dim: int,
-        sf_r_dim: int,
-        sf_s_dim: int,
+        sf_dim: int,
+        snac_split_ratio: int,
         fc_dim: int = 256,
         activation: nn.Module = nn.ELU(),
     ):
@@ -294,8 +295,8 @@ class AutoEncoder(nn.Module):
         input_dim = int(first_dim * second_dim * in_channels)
 
         # Parameters
-        self.sf_r_dim = sf_r_dim
-        self.sf_s_dim = sf_s_dim
+        self.sf_r_dim = floor(sf_dim * snac_split_ratio)
+        self.sf_s_dim = sf_dim - self.sf_r_dim
         self.fc_dim = fc_dim
 
         self.logstd_range = (-5, 2)
@@ -309,7 +310,7 @@ class AutoEncoder(nn.Module):
         self.encoder = MLP(
             input_dim=input_dim,
             hidden_dims=(fc_dim, fc_dim, fc_dim),
-            output_dim=sf_r_dim + sf_s_dim,
+            output_dim=self.sf_r_dim + self.sf_s_dim,
             activation=self.act,
         )
 
@@ -320,7 +321,7 @@ class AutoEncoder(nn.Module):
 
         ### Decoding module
         self.de_latent = MLP(
-            input_dim=sf_s_dim,
+            input_dim=self.sf_s_dim,
             hidden_dims=(int(fc_dim / 2),),
             activation=self.act,
         )

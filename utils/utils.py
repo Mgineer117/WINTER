@@ -10,8 +10,24 @@ import gymnasium as gym
 import matplotlib.pyplot as plt
 from datetime import datetime
 from sklearn.cluster import KMeans
+from utils.get_args import get_args
 from torch.utils.tensorboard import SummaryWriter
 from log.wandb_logger import WandbLogger
+
+
+def override_args(env_name: str | None):
+    args = get_args(verbose=False)
+    if env_name is not None:
+        args.env_name = env_name
+    file_path = "assets/env_params.json"
+    current_params = load_hyperparams(file_path=file_path, env_name=args.env_name)
+
+    # use pre-defined params if no pram given as args
+    for k, v in current_params.items():
+        if getattr(args, k) is None:
+            setattr(args, k, v)
+
+    return args
 
 
 def load_hyperparams(file_path, env_name):
@@ -301,9 +317,6 @@ def save_dim_to_args(env, args):
     elif isinstance(env.action_space, gym.spaces.Box):
         args.a_dim = int(env.action_space.shape[0])
     args.grid_size = int(args.s_dim[0])
-    args.num_weights = 2 * (
-        args.r_option_num + args.s_option_num * int(args.sf_s_dim != 0)
-    )
 
     print(f"Problem dimension (|S|/|A|): {args.s_dim}/{args.a_dim}")
     env.close()
@@ -334,7 +347,15 @@ def setup_logger(args, unique_id, seed):
     args.logdir = os.path.join(args.logdir, args.group)
 
     default_cfg = vars(args)
-    logger = WandbLogger(default_cfg, args.project, args.group, args.name, args.logdir, True, args.render_fps)
+    logger = WandbLogger(
+        default_cfg,
+        args.project,
+        args.group,
+        args.name,
+        args.logdir,
+        True,
+        args.render_fps,
+    )
     logger.save_config(default_cfg, verbose=args.verbose)
 
     tensorboard_path = os.path.join(logger.log_dir, "tensorboard")

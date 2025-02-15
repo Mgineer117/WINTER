@@ -49,74 +49,29 @@ def compare_network_weights(model1: nn.Module, model2: nn.Module) -> float:
     return average_mse
 
 
-def generate_2d_heatmap_image(Z, img_size):
-    # Create a 2D heatmap and save it as an image
-    fig, ax = plt.subplots(figsize=(5, 5))
-
-    # Example data for 2D heatmap
-    vector_length = Z.shape[0]
-    grid_size = int(np.sqrt(vector_length))
-
-    if grid_size**2 != vector_length:
-        raise ValueError(
-            "The length of the eigenvector must be a perfect square to reshape into a grid."
-        )
-
-    Z = Z.reshape((grid_size, grid_size))
-
-    norm_Z = np.linalg.norm(Z)
-    # Plot heatmap
-    heatmap = ax.imshow(Z, cmap="binary", aspect="auto")
-    fig.colorbar(heatmap, ax=ax, shrink=0.5, aspect=5)
-
-    ax.set_title(f"Norm of Z: {norm_Z:.2f}", pad=20)
-
-    # Save the heatmap to a file
-    id = str(uuid.uuid4())
-    file_name = f"temp/{id}.png"
-    plt.savefig(file_name, bbox_inches="tight", pad_inches=0)
-    plt.close()
-
-    # Read the saved image
-    plot_img = cv2.imread(file_name)
-    os.remove(file_name)
-    plot_img = cv2.resize(
-        plot_img, (img_size, img_size)
-    )  # Resize to match frame height
-    return plot_img
-
-
-def normalize_tensor(tensor):
-    norm = torch.norm(tensor, p=2)  # Compute L2 norm
-    if norm.item() != 0:  # Check if norm is not zero to avoid division by zero
-        tensor.data /= norm
-    return tensor
-
-
-class LASSO(BasePolicy):
+class SF_EigenOption(BasePolicy):
     def __init__(
         self,
         env_name: str,
         feaNet: ConvNetwork,
-        feature_weights: np.ndarray,
+        feature_weights: np.ndarray,  # not used but kept for consistency
         a_dim: int,
-        sf_r_dim: int,
-        sf_s_dim: int,
+        sf_dim: int,
+        snac_split_ratio: float,  # not used but kept for consistency
         sf_lr: float = 1e-4,
         batch_size: int = 1024,
         reward_loss_scaler: float = 1.0,
         state_loss_scaler: float = 0.1,
         weight_loss_scaler: float = 1e-6,
-        lasso_loss_scaler: float = 1.0,
+        lasso_loss_scaler: float = 1.0,  # not used but kept for consistency
         is_discrete: bool = False,
         sf_path: str | None = None,
         device: str = "cpu",
     ):
-        super(LASSO, self).__init__()
+        super(SF_EigenOption, self).__init__()
 
         ### constants
-        self.sf_r_dim = sf_r_dim
-        self.sf_s_dim = sf_s_dim
+        self.sf_dim = sf_dim
 
         self.env_name = env_name
         self.device = device
@@ -127,7 +82,6 @@ class LASSO(BasePolicy):
         self._reward_loss_scaler = reward_loss_scaler
         self._state_loss_scaler = state_loss_scaler
         self._weight_loss_scaler = weight_loss_scaler
-        self._lasso_loss_scaler = lasso_loss_scaler
 
         self._is_discrete = is_discrete
         self._forward_steps = 0
@@ -140,17 +94,6 @@ class LASSO(BasePolicy):
             if not os.path.exists(sf_path):
                 os.mkdir(sf_path)
         self.sf_path = sf_path
-
-        ### Define feature_weights
-        self.feature_weights = nn.Parameter(torch.tensor(feature_weights)).to(
-            dtype=self._dtype, device=self.device
-        )
-
-        # # Normalize to have L2 norm = 1
-        # self.feature_weights.data = (
-        #     self.feature_weights.data
-        #     / self.feature_weights.data.norm(p=2, dim=-1, keepdim=True)
-        # )
 
         ### Define optimizers
         self.feature_optims = torch.optim.Adam(
@@ -215,51 +158,11 @@ class LASSO(BasePolicy):
         w ~ [1, F/2]
         """
         phi = self.get_features(states)
-        if self.sf_r_dim == 0:
-            reward_loss = self.dummy
 
-            state_pred = self.decode(phi, actions)
-            state_loss = self._state_loss_scaler * self.mse_loss(
-                state_pred, next_states
-            )
+        state_pred = self.decode(phi, actions)
+        state_loss = self._state_loss_scaler * self.mse_loss(state_pred, next_states)
 
-            phi_r_norm = self.dummy
-            phi_s_norm = torch.norm(phi, p=1)
-
-            lasso_loss = self.dummy
-            lasso_penalty = self.dummy
-
-        elif self.sf_s_dim == 0:
-            reward_pred = self.multiply_weights(phi, self.feature_weights)
-            reward_loss = self._reward_loss_scaler * self.mse_loss(reward_pred, rewards)
-
-            state_loss = self.dummy
-
-            r_dim = torch.tensor(phi.shape[-1], device=self.device)
-
-            phi_r_norm = torch.norm(phi, p=1)
-            phi_s_norm = self.dummy
-
-            lasso_loss = self._lasso_loss_scaler * phi_r_norm
-            lasso_penalty = torch.relu(1e-3 * torch.sqrt(r_dim) - phi_r_norm)
-        else:
-            phi_r, phi_s = self.split(phi, self.sf_r_dim)
-
-            reward_pred = self.multiply_weights(phi_r, self.feature_weights)
-            reward_loss = self._reward_loss_scaler * self.mse_loss(reward_pred, rewards)
-
-            state_pred = self.decode(phi_s, actions)
-            state_loss = self._state_loss_scaler * self.mse_loss(
-                state_pred, next_states
-            )
-
-            r_dim = torch.tensor(phi_r.shape[-1], device=self.device)
-
-            phi_r_norm = torch.norm(phi_r, p=1)
-            phi_s_norm = torch.norm(phi_s, p=1)
-
-            lasso_loss = self._lasso_loss_scaler * phi_r_norm
-            lasso_penalty = torch.relu(1e-3 * torch.sqrt(r_dim) - phi_r_norm)
+        phi_norm = torch.norm(phi, p=1)
 
         weight_norm = 0
         for param in self.feaNet.parameters():
@@ -268,19 +171,12 @@ class LASSO(BasePolicy):
 
         weight_loss = self._weight_loss_scaler * weight_norm
 
-        phi_loss = reward_loss + state_loss + weight_loss + lasso_loss + lasso_penalty
-
-        # Plot predicted vs true rewards
-        if self._forward_steps % 10 == 0:
-            self.plot_rewards(reward_pred, rewards)
+        phi_loss = state_loss + weight_loss
 
         return phi_loss, {
-            "reward_loss": reward_loss,
             "state_loss": state_loss,
             "weight_loss": weight_loss,
-            "lasso_loss": lasso_loss,
-            "phi_r_norm": phi_r_norm,
-            "phi_s_norm": phi_s_norm,
+            "phi_s_norm": phi_norm,
         }
 
     def decode(self, phi, actions):
@@ -301,7 +197,7 @@ class LASSO(BasePolicy):
     def evaluate(self, buffer):
         ### Pull data from the batch
         batch = buffer.sample(self.batch_size)
-        log_num = 10
+        log_num = 5
 
         states = (
             torch.from_numpy(batch["states"]).to(self._dtype).to(self.device)[:log_num]
@@ -310,12 +206,9 @@ class LASSO(BasePolicy):
             torch.from_numpy(batch["actions"]).to(self._dtype).to(self.device)[:log_num]
         )
         next_states = batch["next_states"][:log_num]
-        rewards = batch["rewards"][:log_num]
 
         with torch.no_grad():
             phi = self.get_features(states, deterministic=True)
-            reward_feature, state_feature = self.split(phi, self.sf_r_dim)
-            reward_preds = self.multiply_weights(reward_feature, self.feature_weights)
 
         if self.sf_s_dim != 0:
             ### decoder reconstructed images ###
@@ -325,7 +218,7 @@ class LASSO(BasePolicy):
                 # Decode the feature and append to reconstructed states
                 with torch.no_grad():
                     true_state = next_states[i]
-                    decoded_state = self.decode(state_feature[i], actions[i])
+                    decoded_state = self.decode(phi[i], actions[i])
                     decoded_state = decoded_state.squeeze(0)
 
                 # Handle vector data by reshaping into a heatmap
@@ -353,49 +246,6 @@ class LASSO(BasePolicy):
             ground_truth_images = [None]
             predicted_images = [None]
 
-        if self.sf_r_dim != 0:
-            ### create reward plot ###
-            x = range(log_num)
-            fig, ax = plt.subplots(figsize=(12, 6))
-            ax.stem(
-                x,
-                rewards,
-                linefmt="r-",
-                markerfmt="ro",
-                basefmt="k-",
-                label="True Rewards",
-            )
-            ax.stem(
-                x,
-                reward_preds.cpu().numpy(),
-                linefmt="b-",
-                markerfmt="bo",
-                basefmt="k-",
-                label="Predicted Rewards",
-            )
-
-            # Set logarithmic y-scale
-            # ax.set_yscale('log')
-            ax.set_xlabel("Reward Index")
-            ax.set_ylabel("Reward")
-            ax.set_title("Predicted vs True Rewards")
-            ax.legend()
-            ax.grid(True, which="both", ls="--", linewidth=0.5)
-            plt.tight_layout()
-
-            # Render the figure to a canvas
-            canvas = FigureCanvas(fig)
-            canvas.draw()
-
-            # Convert canvas to a NumPy array
-            reward_pred_img = np.frombuffer(canvas.tostring_rgb(), dtype="uint8")
-            reward_pred_img = reward_pred_img.reshape(
-                canvas.get_width_height()[::-1] + (3,)
-            )  # Shape: (height, width, 3)
-            plt.close()
-        else:
-            reward_pred_img = None
-
         ### FEATURE IMAGE ###
         phi = phi.cpu().numpy()
 
@@ -422,7 +272,6 @@ class LASSO(BasePolicy):
         return {
             "ground_truth": ground_truth_images,
             "prediction": predicted_images,
-            "reward_plot": [reward_pred_img],
             "feature_plot": [feature_img],
         }
 
@@ -446,7 +295,26 @@ class LASSO(BasePolicy):
         self.feature_optims.zero_grad()
         phi_loss.backward()
         torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1.0)
-        phi_grad_dict = self.compute_gradient_norm(
+        grad_dict, norm_dict = self.get_network_grads()
+        self.feature_optims.step()
+
+        ### Logging
+        loss_dict = {
+            "SF/loss": phi_loss.item(),
+            "SF/reward_loss": phi_loss_dict["reward_loss"].item(),
+            "SF/state_loss": phi_loss_dict["state_loss"].item(),
+            "SF/weight_loss": phi_loss_dict["weight_loss"].item(),
+            "SF/phi_s_norm": phi_loss_dict["phi_s_norm"].item(),
+        }
+        loss_dict.update(grad_dict)
+        loss_dict.update(norm_dict)
+
+        t1 = time.time()
+        self.eval()
+        return loss_dict, t1 - t0
+
+    def get_network_grads(self):
+        grad_dict = self.compute_gradient_norm(
             [self.feaNet],
             ["feaNet"],
             dir="SF",
@@ -458,29 +326,11 @@ class LASSO(BasePolicy):
             dir="SF",
             device=self.device,
         )
-        self.feature_optims.step()
-
-        ### Logging
-        loss_dict = {
-            "SF/loss": phi_loss.item(),
-            "SF/reward_loss": phi_loss_dict["reward_loss"].item(),
-            "SF/state_loss": phi_loss_dict["state_loss"].item(),
-            "SF/weight_loss": phi_loss_dict["weight_loss"].item(),
-            # "SF/orthogonal_loss": phi_loss_dict["orthogonal_loss"].item(),
-            "SF/lasso_loss": phi_loss_dict["lasso_loss"].item(),
-            "SF/phi_r_norm": phi_loss_dict["phi_r_norm"].item(),
-            "SF/phi_s_norm": phi_loss_dict["phi_s_norm"].item(),
-        }
-        loss_dict.update(norm_dict)
-        loss_dict.update(phi_grad_dict)
-
-        t1 = time.time()
-        self.eval()
-        return loss_dict, t1 - t0
+        return grad_dict, norm_dict
 
     def get_image(self, true_image, pred_image):
         is_image = True if len(true_image.shape) == 3 else False
-        
+
         if is_image:
             img_list = []
             for img in [true_image, pred_image]:
