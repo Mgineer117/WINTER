@@ -157,8 +157,6 @@ def test_eigenoption():
     ) as pbar:
         try:
             for env_name in ["CtF", "PointNavigation"]:
-                print(f"Testing EigenOption on {env_name}...")
-
                 args = override_args(env_name)
                 args.algo_name = "EigenOption"
                 args.SF_epoch = 10  # Small SF-epoch for quick testing
