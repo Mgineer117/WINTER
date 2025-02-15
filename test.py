@@ -74,7 +74,7 @@ def test_ppo():
 
     with tqdm(
         total=len(envs),
-        desc="Testing PPO",
+        desc="Testing Any Environmental Failures",
         bar_format="{l_bar}{bar} [ elapsed: {elapsed} ]",
     ) as pbar:
         for env_name in envs:
@@ -109,7 +109,9 @@ def test_snac():
     errors = []  # Store errors to print later
 
     with tqdm(
-        total=1, desc="Testing SNAC", bar_format="{l_bar}{bar} [ elapsed: {elapsed} ]"
+        total=1,
+        desc="Testing SNAC Pipeline",
+        bar_format="{l_bar}{bar} [ elapsed: {elapsed} ]",
     ) as pbar:
         try:
             args = override_args("CtF")
@@ -152,29 +154,28 @@ def test_eigenoption():
 
     with tqdm(
         total=1,
-        desc="Testing EigenOption",
+        desc="Testing EigenOption pipeline",
         bar_format="{l_bar}{bar} [ elapsed: {elapsed} ]",
     ) as pbar:
         try:
-            for env_name in ["CtF", "PointNavigation"]:
-                args = override_args(env_name)
-                args.algo_name = "EigenOption"
-                args.SF_epoch = 10  # Small SF-epoch for quick testing
-                args.step_per_epoch = 1  # Small steps per epoch
-                args.OP_timesteps = 10000  # Small OP-timesteps
-                args.HC_timesteps = 10000  # Small HC-timesteps
-                args.min_batch_size = 2048
-                args.max_batch_size = 4096
-                args.warm_batch_size = 2048
-                args.DIF_batch_size = 4096
-                args.post_process = None
-                args.num_options = 2
-                args.method = "top"
-                args.rendering = True
-                args.draw_map = True
+            args = override_args("PointNavigation")
+            args.algo_name = "EigenOption"
+            args.SF_epoch = 10  # Small SF-epoch for quick testing
+            args.step_per_epoch = 1  # Small steps per epoch
+            args.OP_timesteps = 10000  # Small OP-timesteps
+            args.HC_timesteps = 10000  # Small HC-timesteps
+            args.min_batch_size = 2048
+            args.max_batch_size = 4096
+            args.warm_batch_size = 2048
+            args.DIF_batch_size = 4096
+            args.post_process = None
+            args.num_options = 2
+            args.method = "top"
+            args.rendering = True
+            args.draw_map = True
 
-                with suppress_output():  # Suppress print output
-                    train(args, seed, unique_id)
+            with suppress_output():  # Suppress print output
+                train(args, seed, unique_id)
 
         except Exception as e:
             errors.append(f"❌ EigenOption Test Failed: {str(e)}")

@@ -1,0 +1,3 @@
+nohup python3 main.py --env-name Maze --project Maze --algo-name SNAC --method cvs --gpu-idx 0 --cpu-preserve-rate 0.3 &
+nohup python3 main.py --env-name Maze --project Maze --algo-name SNAC --method crs --gpu-idx 0 --cpu-preserve-rate 0.3 &
+nohup python3 main.py --env-name Maze --project Maze --algo-name PPO --gpu-idx 1 --cpu-preserve-rate 0.3 &

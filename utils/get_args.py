@@ -356,7 +356,7 @@ def get_args(verbose=True):
     parser.add_argument(
         "--op-min-batch-for-worker",
         type=int,
-        default=8192,
+        default=10240,
         help="Minimum batch size assgined for one worker (thread)",
     )
     parser.add_argument(
@@ -452,7 +452,7 @@ def get_args(verbose=True):
     parser.add_argument(
         "--snac-split-ratio",
         type=float,
-        default=0.25,
+        default=0.5,
         help="This is general fully connected dimension for most of network this code.",
     )
     parser.add_argument(
@@ -607,39 +607,33 @@ def get_args(verbose=True):
     )
     parser.add_argument(
         "--import-sf-model",
-        type=bool,
-        default=False,
-        help="it imports previously trained model",
+        action="store_true",
+        help="Imports previously trained SF model",
     )
     parser.add_argument(
         "--import-op-model",
-        type=bool,
-        default=False,
-        help="it imports previously trained model",
+        action="store_true",
+        help="Imports previously trained OP model",
     )
     parser.add_argument(
         "--import-hc-model",
-        type=bool,
-        default=False,
-        help="it imports previously trained model",
+        action="store_true",
+        help="Imports previously trained HC model",
     )
     parser.add_argument(
         "--import-ppo-model",
-        type=bool,
-        default=False,
-        help="it imports previously trained model",
+        action="store_true",
+        help="Imports previously trained PPO model",
     )
     parser.add_argument(
         "--import-sac-model",
-        type=bool,
-        default=False,
-        help="it imports previously trained model",
+        action="store_true",
+        help="Imports previously trained SAC model",
     )
     parser.add_argument(
         "--import-oc-model",
-        type=bool,
-        default=False,
-        help="it imports previously trained model",
+        action="store_true",
+        help="Imports previously trained OC model",
     )
 
     parser.add_argument("--gpu-idx", type=int, default=0, help="gpu idx to train")

@@ -82,22 +82,14 @@ def call_env(args):
         args.agent_num = len(env.agents)
         return GridWrapper(env, args)
     elif args.env_name in ("CtF"):
-        # if args.ctf_map == "sparse":
-        #     if args.env_name == "CtF1v1":
-        #         map_path: str = "assets/sparse_ctf_1v1.txt"
-        #     elif args.env_name == "CtF1v2":
-        #         map_path: str = "assets/sparse_ctf_1v2.txt"
-        # elif args.ctf_map == "regular":
         map_path: str = "assets/regular_ctf.txt"
-        # else:
-        #     raise NotImplementedError(f"{map_path} not implemented")
         observation_option: str = "tensor"
         env = CtF(
             map_path=map_path,
             observation_option=observation_option,
             territory_adv_rate=1.0,
             max_steps=args.episode_len,
-            battle_reward_ratio=0.15,
+            battle_reward_ratio=0.25,
             step_penalty_ratio=0.0,
         )
         disc_or_cont(env, args)

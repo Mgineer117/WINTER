@@ -72,8 +72,13 @@ class SF_SNAC(BasePolicy):
         ### Define feature_weights
         if feature_weights is None:
             feature_weights = np.random.normal(0, 1, (1, self.num_r_features))
+            feature_weights = (
+                torch.from_numpy(feature_weights).to(self.device).to(self._dtype)
+            )
+        else:
+            feature_weights = feature_weights.clone().detach()
         self.feature_weights = nn.Parameter(
-            torch.tensor(feature_weights).to(dtype=self._dtype, device=self.device),
+            feature_weights,
             requires_grad=True,
         )
 
