@@ -288,6 +288,12 @@ def get_args(verbose=True):
         help="Base number of batch size for training",
     )
     parser.add_argument(
+        "--DIF-batch-size",
+        type=int,
+        default=None,
+        help="Base number of batch size for training",
+    )
+    parser.add_argument(
         "--op-mode",
         type=str,
         default=None,
@@ -345,6 +351,12 @@ def get_args(verbose=True):
         "--min-batch-for-worker",
         type=int,
         default=2048,
+        help="Minimum batch size assgined for one worker (thread)",
+    )
+    parser.add_argument(
+        "--op-min-batch-for-worker",
+        type=int,
+        default=8192,
         help="Minimum batch size assgined for one worker (thread)",
     )
     parser.add_argument(

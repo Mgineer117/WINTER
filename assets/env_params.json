@@ -87,6 +87,7 @@
         "eval_episodes": 10,
         "max_batch_size": 10000,
         "min_batch_size": 2500,
+        "DIF_batch_size": 10000,
         "post_process": "nonzero_rewards",
         "render_fps": 10,
         "gamma": 0.99
@@ -179,6 +180,7 @@
         "eval_episodes": 10,
         "max_batch_size": 10000,
         "min_batch_size": 2500,
+        "DIF_batch_size": 20000,
         "post_process": "nonzero_rewards",
         "render_fps": 10,
         "gamma": 0.99
@@ -271,6 +273,7 @@
         "eval_episodes": 10,
         "max_batch_size": 10000,
         "min_batch_size": 5000,
+        "DIF_batch_size": 30000,
         "post_process": "nonzero_rewards",
         "render_fps": 10,
         "gamma": 0.99
@@ -363,6 +366,7 @@
         "eval_episodes": 10,
         "max_batch_size": 25000,
         "min_batch_size": 5000,
+        "DIF_batch_size": 30000,
         "post_process": "nonzero_rewards",
         "render_fps": 60,
         "gamma": 0.99

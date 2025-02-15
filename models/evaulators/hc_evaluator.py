@@ -117,7 +117,6 @@ class HC_Evaluator(Evaluator):
                     os.mkdir(self.gridDir)
                 self.path = []
                 self.path_marker = []
-                self.option_indices = {"x": [], "y": []}
             else:
                 self.gridPlot = False
             if renderPlot:
@@ -182,14 +181,14 @@ class HC_Evaluator(Evaluator):
 
             done = False
             self.external_t = 1
+            self.option_indices = {"x": [], "y": []}
             while not done:
                 with torch.no_grad():
                     a, metaData = policy(obs, idx, deterministic=False)
                     a = a.cpu().numpy().squeeze() if a.shape[-1] > 1 else [a.item()]
 
-                if num_episodes == 0 and self.gridPlot:
-                    self.option_indices["x"].append(self.external_t)
-                    self.option_indices["y"].append(metaData["z_argmax"].numpy())
+                self.option_indices["x"].append(self.external_t)
+                self.option_indices["y"].append(metaData["z_argmax"].numpy())
 
                 ### Create an Option Loop
                 if metaData["is_option"]:
@@ -245,17 +244,21 @@ class HC_Evaluator(Evaluator):
                     if num_episodes == 0 and self.gridPlot:
                         # final agent pos
                         self.get_agent_pos(env)
-                        
+
                         path_image = self.plotPath()
                         self.path = []
 
                         # save option indices
                         option_image = self.plotOptionIndices()
-                        self.option_indices = {"x": [], "y": []}
+                    else:
+                        option_image = None
 
                     if num_episodes == 0 and self.renderPlot:
                         path_render = self.plotRender()
                         self.recorded_frames = []
+                    else:
+                        path_image = None
+                        path_render = None
 
         reward_list = [ep_info["ep_reward"] for ep_info in ep_buffer]
         length_list = [ep_info["ep_length"] for ep_info in ep_buffer]

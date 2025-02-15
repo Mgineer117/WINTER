@@ -20,11 +20,8 @@ class EigenOption:
     def __init__(
         self,
         env: gym.Env,
-        sf_network: nn.Module,
         logger: WandbLogger,
         writer: SummaryWriter,
-        reward_options: np.ndarray,
-        state_options: np.ndarray,
         args,
     ):
         """
@@ -69,27 +66,12 @@ class EigenOption:
         )
 
         # object initialization
-        self.sf_network = sf_network
         self.logger = logger
         self.writer = writer
-        self.reward_options = reward_options
-        self.state_options = state_options
         self.args = args
 
         # param initialization
         self.curr_timesteps = args.SF_epoch * args.step_per_epoch
-
-        if args.env_name in ("OneRoom", "FourRooms", "Maze", "CtF"):
-            images = get_reward_maps(
-                env=env,
-                sf_network=sf_network,
-                V=[reward_options, state_options],
-                feature_dim=args.sf_r_dim + args.sf_s_dim,
-                grid_type=args.grid_type,
-            )
-            self.logger.write_images(
-                step=self.curr_timesteps, images=images, log_dir="RewardMap/Options"
-            )
 
         # SF checkpoint b/c plotter will only be used
         (
@@ -162,6 +144,7 @@ class EigenOption:
             sf_network=self.sf_network,
             sampler=ft.sampler,
             buffer=ft.buffer,
+            DIF_batch_size=self.args.DIF_batch_size,
             grid_type=self.args.grid_type,
             gamma=self.args.gamma,
             method=self.args.method,
@@ -190,7 +173,9 @@ class EigenOption:
         """
         total_batch_size = int(self.args.op_batch_size * self.args.K_epochs)
         self.sampler.initialize(
-            batch_size=total_batch_size, num_option=self.args.num_weights
+            batch_size=total_batch_size,
+            num_option=2 * self.args.num_options,
+            min_batch_for_worker=self.args.op_min_batch_for_worker,
         )
 
         if not self.args.import_op_model:
@@ -206,7 +191,7 @@ class EigenOption:
                 logger=self.logger,
                 writer=self.writer,
                 evaluator=self.op_evaluator,
-                num_weights=self.args.num_weights,
+                num_weights=2 * self.args.num_options,
                 mode=self.args.op_mode,
                 timesteps=self.args.OP_timesteps,
                 init_timesteps=self.curr_timesteps,
@@ -228,7 +213,11 @@ class EigenOption:
         options and the random walk.
         """
         total_batch_size = int(self.args.hc_batch_size * self.args.K_epochs / 2)
-        self.sampler.initialize(batch_size=total_batch_size, num_option=1)
+        self.sampler.initialize(
+            batch_size=total_batch_size,
+            num_option=1,
+            min_batch_for_worker=self.args.min_batch_for_worker,
+        )
 
         self.hc_network = call_hcNetwork(self.sf_network, self.op_network, self.args)
         print_model_summary(self.hc_network, model_name="HC model")

@@ -72,6 +72,8 @@ class SF_EigenOption(BasePolicy):
 
         ### constants
         self.sf_dim = sf_dim
+        self.num_r_features = 0
+        self.num_s_features = sf_dim - self.num_r_features
 
         self.env_name = env_name
         self.device = device
@@ -301,7 +303,6 @@ class SF_EigenOption(BasePolicy):
         ### Logging
         loss_dict = {
             "SF/loss": phi_loss.item(),
-            "SF/reward_loss": phi_loss_dict["reward_loss"].item(),
             "SF/state_loss": phi_loss_dict["state_loss"].item(),
             "SF/weight_loss": phi_loss_dict["weight_loss"].item(),
             "SF/phi_s_norm": phi_loss_dict["phi_s_norm"].item(),

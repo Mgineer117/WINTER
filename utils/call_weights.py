@@ -24,6 +24,7 @@ def call_options(
     sf_network: SF_LASSO,
     sampler: OnlineSampler,
     buffer: TrajectoryBuffer,
+    DIF_batch_size: int,
     grid_type: int,
     gamma: float,
     method: str = "top",
@@ -40,7 +41,7 @@ def call_options(
         num_s_features = sf_dim
 
     # Warm buffer
-    buffer.max_batch_size = int(3e4)
+    buffer.max_batch_size = DIF_batch_size
     buffer = warm_buffer(sf_network, sampler, buffer, grid_type)
     samples = buffer.sample_all()
 
@@ -51,7 +52,6 @@ def call_options(
     # get features (phi and psi)
     with torch.no_grad():
         features = sf_network.get_features(states, deterministic=True, to_numpy=True)
-    _, features = sf_network.split(features, sf_network.sf_r_dim)
     psi = estimate_psi(features, terminals=terminals, gamma=gamma)
 
     # prepare for subtask discovery
@@ -67,7 +67,6 @@ def call_options(
         _, S_S, V_S = np.linalg.svd(psi)
         subtask_vectors = {"rewards": None, "states": V_S}
 
-    reward_options, state_options = [], []
     for key, subtask_vector in subtask_vectors.items():
         if key == "rewards":
             if subtask_vector is not None:
@@ -124,15 +123,15 @@ def call_options(
         # Include both the original and negative counterparts
         if V is not None:
             if key == "rewards":
-                reward_options.append(np.concatenate((V, -V), axis=0))
+                reward_options = np.concatenate((V, -V), axis=0)
             else:
-                state_options.append(np.concatenate((V, -V), axis=0))
+                state_options = np.concatenate((V, -V), axis=0)
         else:
             if key == "rewards":
-                reward_options.append(None)
+                reward_options = None
             else:
                 # shouldn't be None
-                state_options.append(None)
+                state_options = None
 
     return reward_options, state_options
 
@@ -207,7 +206,7 @@ def plotRewardMap(
     num_state_options = V[1].shape[0] if V[1] is not None else 0
     agent_dirs = [0, 1, 2, 3]
     num_vec = num_reward_options + num_state_options
-    sf_r_dim = sf_network.sf_r_dim
+    num_r_features = sf_network.num_r_features
 
     x_coords, y_coords = coords
     device_of_model = next(sf_network.parameters()).device
@@ -272,7 +271,10 @@ def plotRewardMap(
     # deltaPhi -= features
     deltaPhi = features
 
-    r_deltaPhi, s_deltaPhi = deltaPhi[:, :, :sf_r_dim], deltaPhi[:, :, sf_r_dim:]
+    r_deltaPhi, s_deltaPhi = (
+        deltaPhi[:, :, :num_r_features],
+        deltaPhi[:, :, num_r_features:],
+    )
 
     for vec_idx in range(num_vec):
         is_reward_option = True if vec_idx < num_reward_options else False

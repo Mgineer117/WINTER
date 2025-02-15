@@ -144,6 +144,7 @@ class SNAC:
             sf_network=self.sf_network,
             sampler=ft.sampler,
             buffer=ft.buffer,
+            DIF_batch_size=self.args.DIF_batch_size,
             grid_type=self.args.grid_type,
             gamma=self.args.gamma,
             method=self.args.method,
@@ -173,7 +174,7 @@ class SNAC:
         total_batch_size = int(self.args.op_batch_size * self.args.K_epochs)
         self.sampler.initialize(
             batch_size=total_batch_size,
-            num_option=self.args.num_weights,
+            num_option=2 * self.args.num_options,
             min_batch_for_worker=self.args.op_min_batch_for_worker,
         )
 
@@ -190,7 +191,7 @@ class SNAC:
                 logger=self.logger,
                 writer=self.writer,
                 evaluator=self.op_evaluator,
-                num_weights=self.args.num_weights,
+                num_weights=2 * self.args.num_options,
                 mode=self.args.op_mode,
                 timesteps=self.args.OP_timesteps,
                 init_timesteps=self.curr_timesteps,
@@ -212,7 +213,11 @@ class SNAC:
         options and the random walk.
         """
         total_batch_size = int(self.args.hc_batch_size * self.args.K_epochs / 2)
-        self.sampler.initialize(batch_size=total_batch_size, num_option=1)
+        self.sampler.initialize(
+            batch_size=total_batch_size,
+            num_option=1,
+            min_batch_for_worker=self.args.min_batch_for_worker,
+        )
 
         self.hc_network = call_hcNetwork(self.sf_network, self.op_network, self.args)
         print_model_summary(self.hc_network, model_name="HC model")

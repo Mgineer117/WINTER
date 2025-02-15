@@ -318,6 +318,11 @@ def call_sfNetwork(args, sf_path: str | None = None):
     from models.layers.sf_networks import AutoEncoder, VAE, ConvNetwork
     from models.policy import SF_LASSO, SF_SNAC, SF_EigenOption
 
+    if args.algo_name == "SNAC":
+        snac_split_ratio = args.snac_split_ratio
+    else:
+        snac_split_ratio = 0.0
+
     if args.import_sf_model:
         print("Loading previous SF parameters....")
         feaNet, reward_feature_weights = pickle.load(
@@ -337,7 +342,7 @@ def call_sfNetwork(args, sf_path: str | None = None):
                 action_dim=args.a_dim,
                 fc_dim=args.sf_fc_dim,
                 sf_dim=args.sf_dim,
-                snac_split_ratio=args.snac_split_ratio,
+                snac_split_ratio=snac_split_ratio,
                 activation=nn.ELU(),
             )
         else:
@@ -356,7 +361,7 @@ def call_sfNetwork(args, sf_path: str | None = None):
                 decoder_conv_layers=decoder_conv_layers,
                 fc_dim=args.sf_fc_dim,
                 sf_dim=args.sf_dim,
-                snac_split_ratio=args.snac_split_ratio,
+                snac_split_ratio=snac_split_ratio,
                 activation=nn.Tanh(),
             )
 
@@ -370,7 +375,7 @@ def call_sfNetwork(args, sf_path: str | None = None):
         feature_weights=reward_feature_weights,
         a_dim=args.a_dim,
         sf_dim=args.sf_dim,
-        snac_split_ratio=args.snac_split_ratio,
+        snac_split_ratio=snac_split_ratio,
         sf_lr=args.sf_lr,
         batch_size=args.sf_batch_size,
         reward_loss_scaler=args.reward_loss_scaler,
@@ -392,6 +397,11 @@ def call_opNetwork(
     args,
 ):
     from models.policy import OP_Controller
+
+    if args.algo_name == "SNAC":
+        snac_split_ratio = args.snac_split_ratio
+    else:
+        snac_split_ratio = 0.0
 
     if args.import_op_model:
         print("Loading previous OP parameters....")
@@ -416,14 +426,14 @@ def call_opNetwork(
                 input_dim=args.flat_s_dim,
                 hidden_dim=args.op_policy_dim,
                 a_dim=args.a_dim,
-                num_weights=args.num_weights,
+                num_weights=2 * args.num_options,
                 activation=nn.ReLU(),
                 is_discrete=args.is_discrete,
             )
             critic = OPtionCriticTwin(
                 input_dim=args.flat_s_dim + args.a_dim,
                 hidden_dim=args.op_critic_dim,
-                num_weights=args.num_weights,
+                num_weights=2 * args.num_options,
                 activation=nn.ReLU(),
             )
             alpha = args.sac_init_alpha
@@ -432,14 +442,14 @@ def call_opNetwork(
                 input_dim=args.flat_s_dim,
                 hidden_dim=args.op_policy_dim,
                 a_dim=args.a_dim,
-                num_weights=args.num_weights,
+                num_weights=2 * args.num_options,
                 activation=nn.Tanh(),
                 is_discrete=args.is_discrete,
             )
             critic = OptionCritic(
                 input_dim=args.flat_s_dim,
                 hidden_dim=args.op_critic_dim,
-                num_weights=args.num_weights,
+                num_weights=2 * args.num_options,
                 activation=nn.Tanh(),
             )
             alpha = None
@@ -448,8 +458,8 @@ def call_opNetwork(
         sf_network=sf_network,
         policy=policy,
         critic=critic,
-        sf_r_dim=args.sf_r_dim,
-        sf_s_dim=args.sf_s_dim,
+        sf_dim=args.sf_dim,
+        snac_split_ratio=snac_split_ratio,
         reward_options=reward_options,
         state_options=state_options,
         minibatch_size=args.op_batch_size,
@@ -472,7 +482,7 @@ def call_hcNetwork(sf_network: nn.Module, op_network: nn.Module, args):
         policy = HC_Policy(
             input_dim=args.flat_s_dim,
             hidden_dim=args.hc_policy_dim,
-            hc_action_dim=args.num_weights + 1,
+            hc_action_dim=2 * args.num_options + 1,
             activation=nn.Tanh(),
         )
         if args.PM_policy == "PPO":

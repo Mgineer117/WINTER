@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pickle
 import numpy as np
 import torch
-import math
+from math import floor
 from copy import deepcopy
 import torch.nn as nn
 import torch.nn.functional as F
@@ -28,8 +28,8 @@ class OP_Controller(BasePolicy):
         sf_network: BasePolicy,
         policy: OptionPolicy,
         critic: OptionCritic,
-        sf_r_dim: int,
-        sf_s_dim: int,
+        sf_dim: int,
+        snac_split_ratio: float,
         reward_options: np.ndarray,
         state_options: np.ndarray,
         alpha: int,
@@ -50,8 +50,8 @@ class OP_Controller(BasePolicy):
         self.device = args.device
 
         # algorithmic commons
-        self.sf_r_dim = sf_r_dim
-        self.sf_s_dim = sf_s_dim
+        self.sf_r_dim = floor(sf_dim * snac_split_ratio)
+        self.sf_s_dim = sf_dim - self.sf_r_dim
 
         if reward_options is not None:
             self.reward_options = nn.Parameter(torch.tensor(reward_options)).to(
@@ -61,6 +61,7 @@ class OP_Controller(BasePolicy):
         else:
             self.reward_options = None
             self.num_reward_options = 0
+
         if state_options is not None:
             self.state_options = nn.Parameter(torch.tensor(state_options)).to(
                 dtype=self._dtype, device=self.device
@@ -70,7 +71,7 @@ class OP_Controller(BasePolicy):
             self.state_options = None
             self.num_state_options = 0
 
-        self.num_weights = self.num_reward_options + self.num_state_options
+        self.num_subtasks = self.num_reward_options + self.num_state_options
 
         # params for training
         self.optimizers = {}
@@ -88,7 +89,7 @@ class OP_Controller(BasePolicy):
             self._target_entropy = -self._a_dim
 
             if self.mode == "sac":
-                self.alpha = torch.full((self.num_weights,), alpha, device=self.device)
+                self.alpha = torch.full((self.num_subtasks,), alpha, device=self.device)
                 if self._tune_alpha:
                     self.log_alpha = nn.Parameter(torch.log(self.alpha))
                     self.optimizers["alpha"] = torch.optim.Adam(
@@ -183,7 +184,7 @@ class OP_Controller(BasePolicy):
             weight = self.reward_options[z]
             # print(f"z: {z}, is_reward {is_reward_option}, {self.reward_options[z]}")
         else:
-            z = z - self.reward_options.shape[0]
+            z = z - self.num_reward_options
             _, deltaPhi = self.split(deltaPhi, self.sf_r_dim)
             weight = self.state_options[z]
             # print(f"z: {z}, is_reward {is_reward_option}, {self.state_options[z]}")
@@ -499,7 +500,11 @@ class OP_Controller(BasePolicy):
     def save_model(self, logdir, epoch=None, is_best=False):
         self.policy = self.policy.cpu()
         self.critic = self.critic.cpu()
-        reward_options = self.reward_options.detach().clone().cpu().numpy()
+        reward_options = (
+            self.reward_options.detach().clone().cpu().numpy()
+            if self.reward_options is not None
+            else self.reward_options
+        )
         state_options = (
             self.state_options.detach().clone().cpu().numpy()
             if self.state_options is not None
