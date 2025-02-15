@@ -88,7 +88,7 @@ class OptionCritic:
         torch.cuda.empty_cache()
 
     def train_oc(self):
-        self.sampler.initialize(batch_size=int(self.args.oc_batch_size))
+        self.sampler.initialize(batch_size=int(self.args.oc_batch_size), num_option=1, min_batch_for_worker=self.args.min_batch_for_worker)
 
         ### Call network param and run
         self.oc_network = call_ocNetwork(self.args)

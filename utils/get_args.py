@@ -344,7 +344,13 @@ def get_args(verbose=True):
     parser.add_argument(
         "--min-batch-for-worker",
         type=int,
-        default=2048,
+        default=4096,
+        help="Minimum batch size assgined for one worker (thread)",
+    )
+    parser.add_argument(
+        "--op-min-batch-for-worker",
+        type=int,
+        default=8192,
         help="Minimum batch size assgined for one worker (thread)",
     )
     parser.add_argument(
@@ -596,7 +602,7 @@ def get_args(verbose=True):
     parser.add_argument(
         "--import-sf-model",
         type=bool,
-        default=False,
+        default=True,
         help="it imports previously trained model",
     )
     parser.add_argument(

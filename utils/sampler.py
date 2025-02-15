@@ -297,8 +297,9 @@ class OnlineSampler(Base):
         # enforce one thread for each worker to avoid CPU overscription.
         torch.set_num_threads(1)
 
-    def initialize(self, batch_size: int, num_option: int | None, verbose: bool = True):
+    def initialize(self, batch_size: int, num_option: int | None, min_batch_for_worker: int, verbose: bool = True):
         # sampling params
+        self.min_batch_for_worker = min_batch_for_worker
         self.num_options = num_option
         self.thread_batch_size = self.min_batch_for_worker + 2 * self.episode_len
         self.batch_size = batch_size
