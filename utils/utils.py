@@ -15,7 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from log.wandb_logger import WandbLogger
 
 
-def override_args(env_name: str | None):
+def override_args(env_name: str | None = None):
     args = get_args(verbose=False)
     if env_name is not None:
         args.env_name = env_name

@@ -61,6 +61,8 @@ def test_ppo():
         args.algo_name = "PPO"
         args.PPO_timesteps = 10000  # Small number of timesteps for quick testing
         args.min_batch_for_worker = 1024
+        args.rendering = True
+        args.draw_map = True
         train(args, seed, unique_id)
 
 
@@ -80,6 +82,8 @@ def test_snac():
     args.step_per_epoch = 1  # Small steps per epoch
     args.OP_timesteps = 10000  # Small OP-timesteps
     args.HC_timesteps = 10000  # Small HC-timesteps
+    args.rendering = True
+    args.draw_map = True
     train(args, seed, unique_id)
 
 
