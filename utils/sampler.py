@@ -99,7 +99,9 @@ class Base:
         policy.to_device(torch.device("cpu"))
 
         # Select appropriate sampler function
-        sample_fn = self.collect_trajectory4Option if is_option else self.collect_trajectory
+        sample_fn = (
+            self.collect_trajectory4Option if is_option else self.collect_trajectory
+        )
 
         idx_idx = 0
         worker_idx = 0
@@ -114,8 +116,13 @@ class Base:
         # Iterate over rounds
         for round_number in range(self.rounds):
             processes = []
-            indices = option_indices[idx_idx:] if round_number == self.rounds - 1 else \
-                    option_indices[idx_idx : idx_idx + self.num_idx_per_round[round_number]]
+            indices = (
+                option_indices[idx_idx:]
+                if round_number == self.rounds - 1
+                else option_indices[
+                    idx_idx : idx_idx + self.num_idx_per_round[round_number]
+                ]
+            )
 
             # Iterate over indices
             for idx in indices:
@@ -182,7 +189,9 @@ class Base:
                     continue
                 for key in worker_memory:
                     if key in memory:
-                        memory[key] = np.concatenate((memory[key], worker_memory[key]), axis=0)
+                        memory[key] = np.concatenate(
+                            (memory[key], worker_memory[key]), axis=0
+                        )
                     else:
                         memory[key] = worker_memory[key]
 
@@ -204,7 +213,9 @@ class Base:
                 for batch in batch_list:
                     for key, value in batch.items():
                         if key in stacked_dict:
-                            stacked_dict[key] = np.concatenate((stacked_dict[key], value), axis=0)
+                            stacked_dict[key] = np.concatenate(
+                                (stacked_dict[key], value), axis=0
+                            )
                         else:
                             stacked_dict[key] = value
 
@@ -297,8 +308,15 @@ class OnlineSampler(Base):
         # enforce one thread for each worker to avoid CPU overscription.
         torch.set_num_threads(1)
 
-    def initialize(self, batch_size: int, num_option: int | None, verbose: bool = True):
+    def initialize(
+        self,
+        batch_size: int,
+        num_option: int | None,
+        min_batch_for_worker: int,
+        verbose: bool = True,
+    ):
         # sampling params
+        self.min_batch_for_worker = min_batch_for_worker
         self.num_options = num_option
         self.thread_batch_size = self.min_batch_for_worker + 2 * self.episode_len
         self.batch_size = batch_size

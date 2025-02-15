@@ -172,7 +172,9 @@ class SNAC:
         """
         total_batch_size = int(self.args.op_batch_size * self.args.K_epochs)
         self.sampler.initialize(
-            batch_size=total_batch_size, num_option=self.args.num_weights
+            batch_size=total_batch_size,
+            num_option=self.args.num_weights,
+            min_batch_for_worker=self.args.op_min_batch_for_worker,
         )
 
         if not self.args.import_op_model:

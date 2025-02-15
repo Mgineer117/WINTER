@@ -94,8 +94,11 @@ class SAC:
         torch.cuda.empty_cache()
 
     def train_sac(self):
-        self.sampler.initialize(batch_size=int(self.args.sac_batch_size / 2))
-
+        self.sampler.initialize(
+            batch_size=self.args.sac_batch_size,
+            num_option=1,
+            min_batch_for_worker=self.args.min_batch_for_worker,
+        )
         ### Call network parameters and run
         self.sac_network = call_sacNetwork(self.args)
         print_model_summary(self.sac_network, model_name="SAC model")
